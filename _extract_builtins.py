@@ -1,5 +1,5 @@
 #!/usr/bin/env python3.10
-"""Tools for C++ coding."""
+"""Extracts some information from the C++ code."""
 import regex as re
 
 with open("lisp.cpp", "r", encoding="utf-8") as file:
@@ -35,9 +35,8 @@ def get_types() -> str:
     return result
 
 
-t = get_types()
-print(t)
-t = get_builtins()
-print(t)
-
-# print()
+if __name__ == "__main__":
+    t = get_types()
+    print(t)
+    t = get_builtins()
+    print(t)
