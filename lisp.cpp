@@ -234,6 +234,31 @@ long accumulate(std::vector<LispVar> *args,
     return base;
 }
 
+/* Returns a boolean corresponding to whether or not all the items are
+ * ordered according to the function `func`.
+
+Examples
+--------
+std::vector<int> v = {1, 2, 3};
+bool result = vector_is_ordered(&v, std::lesser<long>()) // true
+bool result = vector_is_ordered(&v, std::greater<long>()) // false
+ . */
+bool vector_is_ordered(std::vector<LispVar> *args,
+                       std::function<bool(long, long)> func) {
+    unsigned int arity = args->size();
+    if (!arity) return true;
+
+    bool output = true;
+    long last_num = (*args)[0].num;
+    for (size_t i = 1; i < arity; i++) {
+        output = func(last_num, (*args)[i].num);
+        if (!output) break;
+        last_num = (*args)[i].num;
+    }
+
+    return output;
+}
+
 std::string LispVar::to_str() {
     unsigned int size;
     std::stringstream ss;
@@ -1058,10 +1083,11 @@ LispVar evaluate_builtin(LispVar operation,
         output.num = true;
         output.tag = BOOL;
         if (!arity) return output;
-        auto first = args[0];
+        auto last = (args)[0];
         for (size_t i = 1; i < arity; i++) {
-            output.num &= first == args[i];
+            output.num = last == (args)[i];
             if (!output.num) break;
+            last = (args)[i];
         }
         return output;
     }
@@ -1070,58 +1096,35 @@ LispVar evaluate_builtin(LispVar operation,
         output.num = true;
         output.tag = BOOL;
         if (!arity) return output;
-        auto first = args[0];
+        auto last = (args)[0];
         for (size_t i = 1; i < arity; i++) {
-            output.num &= first != args[i];
+            output.num = last != (args)[i];
             if (!output.num) break;
+            last = (args)[i];
         }
         return output;
     }
     if (!op.compare(">") || !op.compare("gt")) {
         // All arguments should be strictly decreasing.
-        output.num = true;
-        long accumulator = args[0].num;
-        for (size_t i = 1; i < arity; i++) {
-            output.num &= args[i].num < accumulator;
-            if (!output.num) break;
-            accumulator = args[i].num;
-        }
+        output.num = vector_is_ordered(&args, std::greater<long>());
         output.tag = BOOL;
         return output;
     }
     if (!op.compare("<") || !op.compare("lt")) {
         // All arguments should be strictly increasing.
-        output.num = true;
-        long accumulator = args[0].num;
-        for (size_t i = 1; i < arity; i++) {
-            output.num &= args[i].num > accumulator;
-            if (!output.num) break;
-            accumulator = args[i].num;
-        }
+        output.num = vector_is_ordered(&args, std::less<long>());
         output.tag = BOOL;
         return output;
     }
     if (!op.compare(">=") || !op.compare("geq")) {
         // All arguments should be non-strictly decreasing.
-        output.num = true;
-        long accumulator = args[0].num;
-        for (size_t i = 1; i < arity; i++) {
-            output.num &= args[i].num <= accumulator;
-            if (!output.num) break;
-            accumulator = args[i].num;
-        }
+        output.num = vector_is_ordered(&args, std::greater_equal<long>());
         output.tag = BOOL;
         return output;
     }
     if (!op.compare("<=") || !op.compare("leq")) {
         // All arguments should be non-strictly increasing.
-        output.num = true;
-        long accumulator = args[0].num;
-        for (size_t i = 1; i < arity; i++) {
-            output.num &= args[i].num >= accumulator;
-            if (!output.num) break;
-            accumulator = args[i].num;
-        }
+        output.num = vector_is_ordered(&args, std::less_equal<long>());
         output.tag = BOOL;
         return output;
     }
