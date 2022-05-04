@@ -1,3 +1,10 @@
+/* Defines the LispVar class and singleton Lisp variables.
+
+The singletons are the following:
+- _SINGLETON_NOTHING
+- _SINGLETON_NOT_SET
+- _SINGLETON_NOARGS_TOKEN
+*/
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -142,4 +149,9 @@ class LispVar {
     std::string to_str();
     std::string get_help_str();
 };
+
 LispVar parse_and_evaluate(std::string input);
+
+auto _SINGLETON_NOTHING = new LispVar;
+auto _SINGLETON_NOT_SET = new LispVar;
+auto _SINGLETON_NOARGS_TOKEN = new LispVar;

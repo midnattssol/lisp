@@ -2,6 +2,7 @@
 #include <forward_list>
 #include <iostream>
 #include <map>
+#include <sstream>
 #include <vector>
 
 /* A scoped implementation of variables for a programming language running in a
@@ -104,9 +105,10 @@ class VariableScope {
                 // https://stackoverflow.com/a/8234813.
                 if (values->empty()) {
                     this->scopes.erase(it++);
-                } else
-                    it++;
+                    continue;
+                }
             }
+            it++;
         }
     }
 };

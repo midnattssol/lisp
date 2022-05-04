@@ -54,10 +54,6 @@ void _lisp_assert_or_exit(bool condition, std::string message) {
 
 VariableScope<LispVar> VARIABLE_SCOPE = {{}, 0};
 
-auto _SINGLETON_NOTHING = new LispVar;
-auto _SINGLETON_NOT_SET = new LispVar;
-auto _SINGLETON_NOARGS_TOKEN = new LispVar;
-
 std::string LispVar::to_str() {
     unsigned int size;
     std::stringstream ss;
@@ -148,7 +144,7 @@ LispVar parse_expression(std::string expression);
 LispVar evaluate_tree(LispVar *expression, unsigned int index);
 
 /* Todo: this implementation probably leaks memory like a sieve. */
-LispVar *call_function(std::vector<LispVar> arguments) {
+LispVar call_function(std::vector<LispVar> arguments) {
     LispVar function = arguments[0];
     assert(function.tag == EXPRESSION);
 
@@ -171,7 +167,8 @@ LispVar *call_function(std::vector<LispVar> arguments) {
     for (size_t i = 1; i <= arity; i++) {
         auto a = argument_names.nodes[i];
         auto b = arguments[i];
-        std::cout << *a.string << " was set to " << b.to_str() << '\n';
+        std::cout << "(variable '" << *a.string << "' was set to " << b.to_str()
+                  << ")\n";
         VARIABLE_SCOPE.set_var(a.string, b);
     }
 
@@ -182,8 +179,9 @@ LispVar *call_function(std::vector<LispVar> arguments) {
 
     callable->tree = ptr;
     callable->tag = EXPRESSION;
-    auto result = callable;
-    // auto result = evaluate_tree(&callable, 0);
+
+    auto result = evaluate_tree(callable, 0);
+    delete callable;
 
     // If it is a closure, it can get information from the surrounding
     // scope. If it is a pure function, it can't. This should be checked and
@@ -503,7 +501,7 @@ LispVar evaluate_builtin(LispVar operation,
 
     // No operation.
     if (!op.compare("noop")) { return *_SINGLETON_NOTHING; }
-    if (!op.compare("call")) { return *call_function(args); }
+    if (!op.compare("call")) { return call_function(args); }
 
     // Resolve a string into its variable value.
     if (!op.compare("resolve")) {
@@ -605,25 +603,20 @@ LispVar evaluate_builtin(LispVar operation,
         output.tag = LIST;
 
         auto size = args[0].size();
-        auto index = args[1].num;
+        auto index = args[2].num;
 
         // Allows for negative indices.
-        index = (index < 0) ? size + index : index;
-        std::cout << size << '\n';
-        std::cout << index << '\n';
-        exit(0);
+        index = (index < 0) ? size + index + 1 : index;
         _lisp_assert_or_exit(
             index <= size,
             "OutOfBoundsError: Second argument of `insert` must be "
             "less than or equal to the size of the first argument.");
 
         for (int i = 0; i < size; i++) {
-            (*output.vector).push_back((*args[0].vector)[i]);
             if (i == index) (*output.vector).push_back(args[1]);
+            (*output.vector).push_back((*args[0].vector)[i]);
         }
         if (index == size) (*output.vector).push_back(args[1]);
-
-        *output.vector = {(*args[0].vector)[args[0].vector->size() - 1]};
         return output;
     }
 
@@ -638,7 +631,7 @@ LispVar evaluate_builtin(LispVar operation,
     }
 
     // Get the {0}th element of {1}.
-    if (!op.compare("get") || !op.compare("@")) {
+    if (!op.compare("get")) {
         auto size = args[1].size();
         auto index = args[0].num;
 

@@ -5,6 +5,7 @@ import more_itertools as mit
 
 
 def get_code():
+    """Get the code."""
     with open("builtins.cson", "r", encoding="utf-8") as file:
         content = file.read()
 
@@ -19,6 +20,12 @@ def get_code():
         "bool BUILTINS_TYPES_READY = false;\n"
         "void _fill_out_lisp_builtin_types() {\n"
     )
+    code += (
+        "*_SINGLETON_NOTHING = {NOTHING, 0};\n"
+        "*_SINGLETON_NOT_SET = {__NOT_SET__, 0};\n"
+        "*_SINGLETON_NOARGS_TOKEN = {__NO_ARGS__, 0};\n"
+    )
+
     for i, (builtins, signature) in enumerate(signatures):
         varname = f"type_{i}"
         code += f"auto {varname} = new LispVar;\n"
@@ -33,7 +40,7 @@ def get_code():
         "const std::set<std::string> LISP_BUILTINS = {"
         + ",\n".join(
             sorted(
-                mit.collapse(f'"{b}"' for b, s in signatures),
+                mit.collapse((f'"{i}"' for i in b) for b, s in signatures),
                 key=lambda x: (len(x), x),
             )
         )
@@ -43,6 +50,7 @@ def get_code():
 
 
 def main():
+    """Write the code."""
     with open("gen.h", "w", encoding="utf-8") as file:
         file.write(get_code())
 

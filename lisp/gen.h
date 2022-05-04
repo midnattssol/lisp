@@ -5,6 +5,9 @@
 std::map<std::string, LispVar *> BUILTINS_TYPES = {};
 bool BUILTINS_TYPES_READY = false;
 void _fill_out_lisp_builtin_types() {
+*_SINGLETON_NOTHING = {NOTHING, 0};
+*_SINGLETON_NOT_SET = {__NOT_SET__, 0};
+*_SINGLETON_NOARGS_TOKEN = {__NO_ARGS__, 0};
 auto type_0 = new LispVar;
 *type_0 = parse_and_evaluate("[(map type ['*' 'numeric'])]");
 BUILTINS_TYPES["mul"] = type_0;
@@ -90,24 +93,44 @@ auto type_20 = new LispVar;
 BUILTINS_TYPES["call"] = type_20;
 BUILTINS_TYPES_READY = true;
 }
-const std::set<std::string> LISP_BUILTINS = {"['get']",
-"['let']",
-"['map']",
-"['bool']",
-"['call']",
-"['fold']",
-"['join']",
-"['range']",
-"['slice']",
-"['assert']",
-"['insert']",
-"['repeat']",
-"['ternary']",
-"['typematch']",
-"['len', 'eval']",
-"['neg', 'flip']",
-"['type', 'resolve']",
-"['mod', 'sub', 'div']",
-"['noop', 'list', 'eq', 'neq']",
-"['typeof', 'symbol', 'repr', 'put', 'help']",
-"['mul', 'add', 'or', 'and', 'xor', 'gt', 'geq', 'lt', 'leq']"};
+const std::set<std::string> LISP_BUILTINS = {"eq",
+"gt",
+"lt",
+"or",
+"add",
+"and",
+"div",
+"geq",
+"get",
+"len",
+"leq",
+"let",
+"map",
+"mod",
+"mul",
+"neg",
+"neq",
+"put",
+"sub",
+"xor",
+"bool",
+"call",
+"eval",
+"flip",
+"fold",
+"help",
+"join",
+"list",
+"noop",
+"repr",
+"type",
+"range",
+"slice",
+"assert",
+"insert",
+"repeat",
+"symbol",
+"typeof",
+"resolve",
+"ternary",
+"typematch"};

@@ -1,3 +1,4 @@
+/* Utilities to escape and unescape strings. */
 #include <string>
 
 /* Escapes a string.
