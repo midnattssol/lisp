@@ -1,3 +1,5 @@
 unused
 .source.hash
-lisp
+lisp/lisp
+__pycache__
+*.gch

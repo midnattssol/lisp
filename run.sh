@@ -1,7 +1,5 @@
 #!/bin/sh
-# Quit on errors in any subprocess.
-set -e
-set -o pipefail
-
-sh ./build.sh
-./lisp example.lisp
+python lisp/run_lisp.py --debug example.lisp
+# python lisp/run_lisp.py --dump example.lisp
+# python lisp/run_lisp.py --force example.lisp
+# python lisp/run_lisp.py example.lisp

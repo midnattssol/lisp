@@ -2,13 +2,14 @@
 """Extracts some information from the C++ code."""
 import regex as re
 
-with open("lisp.cpp", "r", encoding="utf-8") as file:
+with open("lisp/lisp.cpp", "r", encoding="utf-8") as file:
     CODE = file.read()
 
 
 def get_builtins() -> str:
     """Get all builtins from the code."""
     results = re.findall(r'op.compare\("([^()]*)"\)', CODE)
+    print("|".join(map(re.escape, sorted(results, key=lambda x: (len(x), x)))))
     strings = map(lambda x: f'"{x}"', sorted(results, key=lambda x: (len(x), x)))
 
     lines = [""]

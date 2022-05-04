@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
@@ -11,47 +12,15 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-/*
-(let add3 (=> {a b c} {+ a b c}))
-*/
 
-// ===| MACROS |===
+#include "./command.h"
+#include "./num.h"
+#include "./scoping.h"
 
-#define LASSERT_TYPE(item, expected, err)                                \
-    if (item.tag != expected) {                                          \
-        std::cout << std::endl << "TypeAssertionError: " << err << '\n'; \
-        exit(1);                                                         \
-    }
-
-// ===| GLOBALS |===
-
-const std::set<std::string> LISP_BUILTINS = {
-    "%",      "&",      "*",      "+",       "-",         "-",         "/",
-    "<",      ">",      "?",      "^",       "|",         "~",         "!=",
-    "<=",     "==",     ">=",     "eq",      "gt",        "lt",        "or",
-    "add",    "and",    "div",    "geq",     "get",       "len",       "leq",
-    "map",    "mod",    "mul",    "neg",     "neq",       "put",       "sub",
-    "xor",    "bool",   "eval",   "flip",    "fold",      "join",      "list",
-    "noop",   "repr",   "type",   "range",   "slice",     "assert",    "insert",
-    "repeat", "symbol", "typeof", "ternary", "typematch", "expression"};
-
-enum LispType {
-    NUM,
-    STRING,
-    LIST,
-    NOTHING,
-    BOOL,
-    VECTOR,
-    BUILTIN,
-    TYPE,
-    EXPRESSION,
-    __NOT_SET__,
-    __NO_ARGS__,
-};
+bool DEBUG_MODE;
 
 // ===| FORWARD DECLARATIONS |===
 
-std::string escape_string(std::string const &s);
 void _lisp_assert_or_exit(bool condition, std::string message);
 [[noreturn]] void _throw_does_not_implement(LispType type,
                                             std::string notimplemented);
@@ -64,7 +33,6 @@ const std::map<unsigned int, const std::string> TYPENAMES{
     {LIST, "list"},
     {NOTHING, "nothing"},
     {BOOL, "bool"},
-    {VECTOR, "vector"},
     {BUILTIN, "builtin"},
     {TYPE, "type"},
     {EXPRESSION, "expression"},
@@ -84,193 +52,20 @@ void _lisp_assert_or_exit(bool condition, std::string message) {
     exit(1);
 }
 
-/* A simple tree template. */
-template <class T>
-class Tree {
-   public:
-    std::vector<T> nodes;
-    std::vector<unsigned int> depths;
+VariableScope<LispVar> VARIABLE_SCOPE = {{}, 0};
 
-    size_t size() { return this->nodes.size(); }
-
-    /* Returns a new subtree from a node and its children. */
-    Tree<T> subtree(unsigned int index) {
-        Tree<T> result;
-        auto base_depth = this->depths[index];
-        auto size = this->size();
-
-        result.nodes.push_back(nodes[index]);
-        result.depths.push_back(0);
-
-        for (size_t i = index + 1; (i < size) && (depths[i] > base_depth);
-             i++) {
-            result.nodes.push_back(nodes[i]);
-            result.depths.push_back(depths[i] - base_depth);
-        }
-        return result;
-    }
-
-    bool operator==(Tree<T> *tree) {
-        unsigned int size = this->size();
-        for (size_t i = 0; i < size; i++) {
-            if (this->depths[i] != tree->depths[i]) { return false; }
-            if (this->nodes[i] != tree->nodes[i]) { return false; }
-        }
-        return true;
-    }
-
-    bool operator!=(Tree<T> *tree) { return !(*this == tree); }
-};
-
-/* A Lisp runtime variable. */
-class LispVar {
-   public:
-    LispType tag;
-    union {
-        long int num;                  // Used by NUM, NOTHING and BOOL.
-        std::string *string;           // Used by STRING, TOKEN and TYPE.
-        std::vector<LispVar> *vector;  // Used by LIST, VECTOR, and SOMETHING.
-        Tree<LispVar> *tree;           // Used by EXPRESSION to store code.
-    };
-
-    /* Whether or not one variable equals another. */
-    bool operator==(LispVar var) {
-        if ((&var) == this) return true;
-        if (var.tag != this->tag) return false;
-        // Must be the same object since tags are the same.
-        if (this->is_singleton()) return true;
-        if (this->is_numeric()) { return this->num == var.num; }
-
-        if (this->tag == STRING || this->tag == VECTOR || this->tag == LIST) {
-            // Loop through the contents.
-            unsigned int size = var.size();
-            if (size != this->size()) return false;
-            for (size_t i = 0; i < size; i++) {
-                if ((*this->vector)[i] != (*var.vector)[i]) return false;
-            }
-            return true;
-        }
-
-        if (this->tag == EXPRESSION) return (*this->tree) == var.tree;
-
-        std::cout << "Reached forbidden part of the == operator for LispVar.\n";
-        exit(1);
-    }
-
-    bool operator!=(LispVar var) { return !(*this == var); }
-
-    bool is_singleton() {
-        return (this->tag == __NOT_SET__ || this->tag == __NO_ARGS__ ||
-                this->tag == NOTHING);
-    }
-
-    bool is_numeric() {
-        return (this->tag == NUM || this->tag == NOTHING || this->tag == BOOL);
-    }
-
-    bool is_sized() {
-        return (this->tag == STRING || this->tag == VECTOR ||
-                this->tag == LIST || this->tag == EXPRESSION);
-    }
-
-    bool is_booly() {
-        return (this->tag == NUM || this->tag == NOTHING || this->tag == BOOL ||
-                this->is_sized());
-    }
-
-    bool truthiness() {
-        if (this->tag == NUM or this->tag == NOTHING or this->tag == BOOL)
-            return this->num;
-        if (this->is_sized()) return this->size();
-        _throw_does_not_implement(this->tag, "truthiness");
-    }
-
-    long size() {
-        if (this->tag == STRING) return this->string->size();
-        if (this->tag == VECTOR || this->tag == LIST)
-            return this->vector->size();
-        if (this->tag == EXPRESSION) return this->tree->size();
-        _throw_does_not_implement(this->tag, "size");
-    }
-
-    std::string to_repr() {
-        auto str = this->to_str();
-        if (this->tag == STRING) { return escape_string(str); }
-        return str;
-    }
-
-    std::string _pretty_tree() {
-        std::stringstream ss;
-        auto size = this->tree->size();
-        for (size_t i = 0; i < size; i++) {
-            if (this->tree->depths[i]) ss << "│ ";
-            for (size_t j = 1; j < this->tree->depths[i]; j++) ss << "· ";
-            ss << this->tree->nodes[i].to_str();
-            if (i != size - 1) { ss << "\n"; }
-        }
-        return ss.str();
-    }
-
-    std::string to_str();
-    std::string get_help_str();
-};
-
-LispVar parse_and_evaluate(std::string input);
-
-std::map<std::string, LispVar *> BUILTINS_TYPES = {
-
-};
-bool BUILTINS_TYPES_READY = false;
-
-LispVar _SINGLETON_NOTHING = {NOTHING, 0};
-LispVar _SINGLETON_NOT_SET = {__NOT_SET__, 0};
-LispVar _SINGLETON_NOARGS_TOKEN = {__NO_ARGS__, 0};
-
-/* Accumulate a vector of numeric LispVars into an integer. */
-long accumulate(std::vector<LispVar> *args,
-                long base,
-                std::function<long(long, long)> func) {
-    for (auto arg : *args) { base = func(base, arg.num); }
-    return base;
-}
-
-/* Returns a boolean corresponding to whether or not all the items are
- * ordered according to the function `func`.
-
-Examples
---------
-std::vector<int> v = {1, 2, 3};
-bool result = vector_is_ordered(&v, std::lesser<long>()) // true
-bool result = vector_is_ordered(&v, std::greater<long>()) // false
- . */
-bool vector_is_ordered(std::vector<LispVar> *args,
-                       std::function<bool(long, long)> func) {
-    unsigned int arity = args->size();
-    if (!arity) return true;
-
-    bool output = true;
-    long last_num = (*args)[0].num;
-    for (size_t i = 1; i < arity; i++) {
-        output = func(last_num, (*args)[i].num);
-        if (!output) break;
-        last_num = (*args)[i].num;
-    }
-
-    return output;
-}
+auto _SINGLETON_NOTHING = new LispVar;
+auto _SINGLETON_NOT_SET = new LispVar;
+auto _SINGLETON_NOARGS_TOKEN = new LispVar;
 
 std::string LispVar::to_str() {
     unsigned int size;
     std::stringstream ss;
 
-    // std::cout << "(DEBUG:tag:" << this->tag << ") ";
-
     if (this->tag == BUILTIN) {
-        // std::cout << BUILTINS_TYPES.at(*(this->string))->tag << '\n';
-        ss << "<Builtin '"
-           << *(this->string)
-           // << BUILTINS_TYPES.at(*(this->string))->to_str()
-           << "'>";
+        ss << "<Builtin '" << *(this->string) << "'>";
+    } else if (this->tag == VARIABLE) {
+        ss << "<Variable '" << *(this->string) << "'>";
     } else if (this->tag == TYPE) {
         ss << "<Type '" << *(this->string) << "'>";
     } else if (this->tag == EXPRESSION) {
@@ -285,7 +80,7 @@ std::string LispVar::to_str() {
         ss << (this->num ? "True" : "False");
     } else if (this->tag == STRING) {
         ss << *(this->string);
-    } else if (this->tag == LIST || this->tag == VECTOR) {
+    } else if (this->tag == LIST) {
         size = this->vector->size();
         ss << "[";
         for (size_t i = 0; i < size; i++) {
@@ -296,18 +91,21 @@ std::string LispVar::to_str() {
     } else {
         if (!TYPENAMES.count(this->tag)) {
             std::cout << "Error: Tag " << this->tag << " not in TYPENAMES.\n";
-        } else
+        } else {
             std::cout << "[CPPBug] The Lisp type" << TYPENAMES.at(this->tag)
                       << " does not implement `to_str`.\n";
+        }
         exit(1);
     }
     return ss.str();
 }
+
 std::string LispVar::get_help_str() {
     std::stringstream ss;
 
     if (this->tag == BUILTIN) {
-        ss << *(this->string) << BUILTINS_TYPES[*this->string];
+        ss << "builtin '" << *(this->string) << "' "
+           << BUILTINS_TYPES[*this->string]->to_str();
     } else if (this->tag == TYPE) {
         return "a type";
     } else if (this->tag == EXPRESSION) {
@@ -320,8 +118,8 @@ std::string LispVar::get_help_str() {
         return "either True or False";
     } else if (this->tag == STRING) {
         return "a string of characters";
-    } else if (this->tag == LIST || this->tag == VECTOR) {
-        return "a vector of other items";
+    } else if (this->tag == LIST) {
+        return "a list of other items";
     } else {
         if (!TYPENAMES.count(this->tag)) {
             std::cout << "Error: Tag " << this->tag << " not in TYPENAMES.\n"
@@ -340,112 +138,6 @@ LispVar evaluate_builtin(LispVar op,
 LispVar evaluate_const(std::string item);
 LispVar parse_expression(std::string expression);
 
-void _fill_out_lisp_builtin_types() {
-    auto star_numeric = new LispVar;
-    auto star = new LispVar;
-    auto one = new LispVar;
-    auto list = new LispVar;
-    auto string = new LispVar;
-    auto star_list = new LispVar;
-    auto one_numeric = new LispVar;
-    auto two_numeric = new LispVar;
-    auto range_type = new LispVar;
-    auto insert_type = new LispVar;
-    auto assert_type = new LispVar;
-    auto bool_type = new LispVar;
-    auto slice_type = new LispVar;
-    auto repeat_type = new LispVar;
-    auto get_type = new LispVar;
-    auto typematch_type = new LispVar;
-    auto map_type = new LispVar;
-    auto fold_type = new LispVar;
-    auto ternary_type = new LispVar;
-
-    // Declares the necessary types.
-    *star_numeric = parse_and_evaluate("[(map type ['*' 'numeric'])]");
-    *star = parse_and_evaluate("[(map type ['*'])]");
-    *one = parse_and_evaluate("[(map type ['any'])]");
-    *list = parse_and_evaluate("[(map type ['list'])]");
-    *string = parse_and_evaluate("[(map type ['string'])]");
-    *star_list = parse_and_evaluate("[(map type ['*' 'list'])]");
-    *one_numeric = parse_and_evaluate("[(map type ['numeric'])]");
-    *two_numeric =
-        parse_and_evaluate("[(map type ['numeric']) (map type ['numeric'])]");
-    *range_type = parse_and_evaluate(
-        "[(map type ['numeric' '?']) (map type ['numeric' '?']) (map type "
-        "['numeric' '?' 'truthy'])]");
-    *insert_type = parse_and_evaluate(
-        "[(map type ['list']) (map type ['numeric']) (map type ['any'])]");
-    *assert_type =
-        parse_and_evaluate("[(map type ['booly']) (map type ['string' '?'])]");
-    *bool_type = parse_and_evaluate("[(map type ['booly'])]");
-    *slice_type = parse_and_evaluate(
-        "[(map type ['list']) (map type ['numeric']) (map type ['numeric' "
-        "'?']) (map type "
-        "['numeric' '?' 'truthy'])]");
-    *repeat_type =
-        parse_and_evaluate("[(map type ['numeric']) (map type ['any'])]");
-    *get_type =
-        parse_and_evaluate("[(map type ['numeric']) (map type ['list'])]");
-    *typematch_type =
-        parse_and_evaluate("[(map type ['list']) (map type ['list'])]");
-    *map_type =
-        parse_and_evaluate("[(map type ['builtin']) (map type ['list' '*'])]");
-    *fold_type = parse_and_evaluate(
-        "[(map type ['builtin']) (map type ['any']) (map type ['list'])]");
-    *ternary_type = parse_and_evaluate(
-        "[(map type ['booly']) (map type ['any']) (map type ['any'])]");
-
-    // General types.
-    BUILTINS_TYPES["*"] = BUILTINS_TYPES["mul"] = BUILTINS_TYPES["+"] =
-        BUILTINS_TYPES["add"] = BUILTINS_TYPES["&"] = BUILTINS_TYPES["and"] =
-            BUILTINS_TYPES["|"] = BUILTINS_TYPES["or"] = BUILTINS_TYPES[">"] =
-                BUILTINS_TYPES["gt"] = BUILTINS_TYPES[">="] =
-                    BUILTINS_TYPES["ge"] = BUILTINS_TYPES["<"] =
-                        BUILTINS_TYPES["lt"] = BUILTINS_TYPES["<="] =
-                            BUILTINS_TYPES["le"] = BUILTINS_TYPES["=="] =
-                                BUILTINS_TYPES["eq"] = BUILTINS_TYPES["!="] =
-                                    BUILTINS_TYPES["neq"] =
-                                        BUILTINS_TYPES["^"] =
-                                            BUILTINS_TYPES["xor"] =
-                                                star_numeric;
-
-    BUILTINS_TYPES["%"] = BUILTINS_TYPES["mod"] = BUILTINS_TYPES["-"] =
-        BUILTINS_TYPES["sub"] = BUILTINS_TYPES["/"] = BUILTINS_TYPES["div"] =
-            two_numeric;
-
-    BUILTINS_TYPES["typeof"] = BUILTINS_TYPES["symbol"] =
-        BUILTINS_TYPES["repr"] = BUILTINS_TYPES["put"] =
-            BUILTINS_TYPES["expression"] = one;
-
-    BUILTINS_TYPES["neg"] = BUILTINS_TYPES["~"] = BUILTINS_TYPES["flip"] =
-        one_numeric;
-
-    BUILTINS_TYPES["noop"] = BUILTINS_TYPES["list"] = star;
-    BUILTINS_TYPES["len"] = BUILTINS_TYPES["eval"] = list;
-    BUILTINS_TYPES["join"] = star_list;
-    BUILTINS_TYPES["type"] = string;
-
-    // Custom types.
-    BUILTINS_TYPES["assert"] = assert_type;
-    BUILTINS_TYPES["bool"] = bool_type;
-    BUILTINS_TYPES["fold"] = fold_type;
-    BUILTINS_TYPES["get"] = get_type;
-    BUILTINS_TYPES["insert"] = insert_type;
-    BUILTINS_TYPES["map"] = map_type;
-    BUILTINS_TYPES["range"] = range_type;
-    BUILTINS_TYPES["repeat"] = repeat_type;
-    BUILTINS_TYPES["slice"] = slice_type;
-    BUILTINS_TYPES["ternary"] = BUILTINS_TYPES["?"] = ternary_type;
-    BUILTINS_TYPES["typematch"] = typematch_type;
-
-    BUILTINS_TYPES_READY = true;
-
-    if (BUILTINS_TYPES.size() != LISP_BUILTINS.size()) {
-        throw std::runtime_error("Not all builtins have been typed.");
-    }
-}
-
 [[noreturn]] void _throw_could_not_cast(LispVar expected, LispVar actual) {
     std::cout << "[casting error] Could not cast `" << actual.to_str()
               << "` to signature `" << expected.to_str() << "`.";
@@ -453,50 +145,62 @@ void _fill_out_lisp_builtin_types() {
 }
 
 // ===| BUILTINS |===
+LispVar evaluate_tree(LispVar *expression, unsigned int index);
 
-/* Escapes a string.
+/* Todo: this implementation probably leaks memory like a sieve. */
+LispVar *call_function(std::vector<LispVar> arguments) {
+    LispVar function = arguments[0];
+    assert(function.tag == EXPRESSION);
 
-Based on https://stackoverflow.com/a/2417875. */
-std::string escape_string(std::string const &s) {
-    std::string out;
-    out += '\'';
-    for (auto c : s) {
-        if (' ' <= c and c <= '~' and c != '\\' and c != '\'')
-            out += c;
-        else {
-            out += '\\';
-            switch (c) {
-                case '\'':
-                    out += '\'';
-                    break;
-                case '\\':
-                    out += '\\';
-                    break;
-                case '\t':
-                    out += 't';
-                    break;
-                case '\r':
-                    out += 'r';
-                    break;
-                case '\n':
-                    out += 'n';
-                    break;
-                default:
-                    char const *const hexdig = "0123456789ABCDEF";
-                    out += 'x';
-                    out += hexdig[c >> 4];
-                    out += hexdig[c & 0xF];
-            }
-        }
+    // Function example: {{n} (+ n 10)}
+    // The first branch is the arguments the function takes.
+    // The second is an expression to execute.
+
+    // Calling a function should first increase the scope depth.
+    VARIABLE_SCOPE.increment();
+
+    assert(VARIABLE_SCOPE.depth < 5);
+
+    // Then it should call (let argname arg) to bind the arguments
+    // to the function values.
+    auto argument_names = function.tree->subtree(1);
+    unsigned int arity = argument_names.size() - 1;
+
+    // Offset for the arity + 1 (base tree index)
+    auto function_steps = function.tree->subtree(arity + 2);
+    for (size_t i = 1; i <= arity; i++) {
+        auto a = argument_names.nodes[i];
+        auto b = arguments[i];
+        std::cout << *a.string << " was set to " << b.to_str() << '\n';
+        VARIABLE_SCOPE.set_var(a.string, b);
     }
-    out += '\'';
-    return out;
+
+    // Then, it should evaluate the function.
+    auto callable = new LispVar;
+    auto ptr = new Tree<LispVar>;
+    *ptr = function_steps;
+
+    callable->tree = ptr;
+    callable->tag = EXPRESSION;
+    auto result = callable;
+    // auto result = evaluate_tree(&callable, 0);
+
+    // If it is a closure, it can get information from the surrounding
+    // scope. If it is a pure function, it can't. This should be checked and
+    // enforced by the Python code.
+
+    // Finally, the scope should be exited and cleaned up.
+    VARIABLE_SCOPE.decrement();
+    return result;
 }
 
 /* Parse a Lisp expression into a tree. */
 LispVar parse_expression(std::string expression) {
+    // expression = exec("python ./preprocessor.py " +
+    // _escape_exec(expression));
+
     auto ast = new Tree<LispVar>;
-    *ast = {{_SINGLETON_NOT_SET}, {0}};
+    *ast = {{*_SINGLETON_NOT_SET}, {0}};
 
     LispVar output;
     output.tag = EXPRESSION;
@@ -563,14 +267,14 @@ LispVar parse_expression(std::string expression) {
                 ast->depths[tree_length - 1] = depth_buffer;
 
                 if (last_was_paren_buffer) {
-                    ast->nodes.push_back(_SINGLETON_NOARGS_TOKEN);
+                    ast->nodes.push_back(*_SINGLETON_NOARGS_TOKEN);
                     ast->depths.push_back(ast->depths[tree_length - 1] + 1);
                     tree_length++;
                 }
 
                 string_buffer = "";
                 ast->depths.push_back(depth);
-                ast->nodes.push_back(_SINGLETON_NOT_SET);
+                ast->nodes.push_back(*_SINGLETON_NOT_SET);
                 tree_length++;
                 last_was_paren_buffer = 0;
                 last_was_paren = 0;
@@ -595,7 +299,7 @@ LispVar parse_expression(std::string expression) {
                                  "' does not have balanced parentheses!");
     }
 
-    if (ast->nodes[tree_length - 1] == _SINGLETON_NOT_SET) {
+    if (ast->nodes[tree_length - 1] == *_SINGLETON_NOT_SET) {
         ast->depths.pop_back();
         ast->nodes.pop_back();
     }
@@ -605,7 +309,7 @@ LispVar parse_expression(std::string expression) {
     // Removes the __NO_ARGS__ tokens from the stream
     // if they aren't necessary.
     for (size_t i = 0; (i + 1) < tree_length; i++) {
-        if (ast->nodes[i] == _SINGLETON_NOARGS_TOKEN) {
+        if (ast->nodes[i] == *_SINGLETON_NOARGS_TOKEN) {
             if (ast->depths[i] == ast->depths[i + 1]) continue;
         }
         new_tree->nodes.push_back(ast->nodes[i]);
@@ -729,14 +433,12 @@ bool _types_match(std::vector<LispVar> args, LispVar expected) {
             if (has_add && !matched && !num_matched_in_repeat) {
                 // The match failed due to getting 0 matches on a +
                 // argument.
-                std::cout << "/* message */" << '\n';
                 return false;
             }
 
             if (has_qmrk && (num_matched_in_repeat > 1)) {
                 // The match failed due to getting > 1 matches on a ?
                 // argument.
-                std::cout << "/* message */" << '\n';
                 continue;
                 // return false;
             }
@@ -778,23 +480,18 @@ LispVar evaluate_builtin(LispVar operation,
                          std::vector<LispVar> args,
                          bool safe) {
     LispVar output;
-    LispType kind = __NOT_SET__;
     auto arity = args.size();
+    LispType kind = arity ? args[0].tag : __NOT_SET__;
     auto op = *operation.string;
-    bool all_same = true;
-
-    if (arity == 1 && args[0] == _SINGLETON_NOARGS_TOKEN) args = {};
-
-    if (arity) {
-        kind = args[0].tag;
-        for (size_t i = 1; (i < arity) and all_same; i++) {
-            all_same &= args[i].tag == kind;
-        }
-    } else
-        all_same = false;
+    if (arity == 1 && args[0] == *_SINGLETON_NOARGS_TOKEN) args = {};
 
     // Typecheck the arguments.
     if (BUILTINS_TYPES_READY && safe) {
+        if (!BUILTINS_TYPES.count(op)) {
+            std::cout << "[bug] Operation '" << op
+                      << "' is not typed. Exiting.\n";
+            exit(1);
+        }
         auto arg_types_match = _types_match(args, *BUILTINS_TYPES.at(op));
         if (!arg_types_match) {
             LispVar actual_type;
@@ -805,7 +502,19 @@ LispVar evaluate_builtin(LispVar operation,
     }
 
     // No operation.
-    if (!op.compare("noop")) { return _SINGLETON_NOTHING; }
+    if (!op.compare("noop")) { return *_SINGLETON_NOTHING; }
+    if (!op.compare("call")) { return *call_function(args); }
+
+    // Resolve a string into its variable value.
+    if (!op.compare("resolve")) {
+        return VARIABLE_SCOPE.get_var(args[0].string);
+    }
+
+    // Bind a string to a variable value.
+    if (!op.compare("let")) {
+        VARIABLE_SCOPE.set_var(args[0].string, args[1]);
+        return *_SINGLETON_NOTHING;
+    }
 
     // ===| Base constructors |===
     if (!op.compare("bool")) return {BOOL, args[0].truthiness()};
@@ -853,13 +562,13 @@ LispVar evaluate_builtin(LispVar operation,
             evaluate_builtin(LispVar{BUILTIN, *temp_string}, {args[0]}).num;
         _lisp_assert_or_exit(
             success, ((arity == 2) ? *args[1].string : "AssertionError"));
-        return _SINGLETON_NOTHING;
+        return *_SINGLETON_NOTHING;
     }
 
     // Write a string to `cout`.
     if (!op.compare("put")) {
         std::cout << args[0].to_str();
-        return _SINGLETON_NOTHING;
+        return *_SINGLETON_NOTHING;
     }
 
     // Get the string representation of {0}.
@@ -896,10 +605,13 @@ LispVar evaluate_builtin(LispVar operation,
         output.tag = LIST;
 
         auto size = args[0].size();
-        auto index = args[2].num;
+        auto index = args[1].num;
 
         // Allows for negative indices.
         index = (index < 0) ? size + index : index;
+        std::cout << size << '\n';
+        std::cout << index << '\n';
+        exit(0);
         _lisp_assert_or_exit(
             index <= size,
             "OutOfBoundsError: Second argument of `insert` must be "
@@ -926,7 +638,7 @@ LispVar evaluate_builtin(LispVar operation,
     }
 
     // Get the {0}th element of {1}.
-    if (!op.compare("get")) {
+    if (!op.compare("get") || !op.compare("@")) {
         auto size = args[1].size();
         auto index = args[0].num;
 
@@ -1027,8 +739,8 @@ LispVar evaluate_builtin(LispVar operation,
         output.tag = LIST;
         output.vector = new std::vector<LispVar>;
 
-        if (stop > start and step < 0) return output;
-        if (stop < start and step > 0) return output;
+        if (stop > start && step < 0) return output;
+        if (stop < start && step > 0) return output;
 
         for (int i = start; (step > 0) ? (i < stop) : (i > stop); i += step) {
             (*output.vector).push_back((*args[0].vector)[i]);
@@ -1044,7 +756,7 @@ LispVar evaluate_builtin(LispVar operation,
     }
 
     // Flow control
-    if (!op.compare("?") || !op.compare("ternary")) {
+    if (!op.compare("ternary")) {
         auto temp_str = "bool";
         auto result = evaluate_builtin({BUILTIN, *temp_str}, {args[0]}).num
                           ? args[1]
@@ -1053,93 +765,88 @@ LispVar evaluate_builtin(LispVar operation,
     }
 
     // Numeric functions
-    if (!op.compare("+") || !op.compare("add")) {
+    if (!op.compare("add")) {
         output.tag = NUM;
         output.num = accumulate(&args, 0, std::plus<long>());
         return output;
     }
-    if (!op.compare("*") || !op.compare("mul")) {
+    if (!op.compare("mul")) {
         output.tag = NUM;
         output.num = accumulate(&args, 1, std::multiplies<long>());
         return output;
     }
-    if (!op.compare("&") || !op.compare("and")) {
+    if (!op.compare("and")) {
         output.tag = NUM;
         output.num = accumulate(&args, ~0, std::bit_and<long>());
         return output;
     }
-    if (!op.compare("|") || !op.compare("or")) {
+    if (!op.compare("or")) {
         output.tag = NUM;
         output.num = accumulate(&args, 0, std::bit_or<long>());
         return output;
     }
-    if (!op.compare("^") || !op.compare("xor")) {
+    if (!op.compare("xor")) {
         output.tag = NUM;
         output.num = accumulate(&args, 0, std::bit_xor<long>());
         return output;
     }
-    if (!op.compare("==") || !op.compare("eq")) {
+    if (!op.compare("eq")) {
         // All arguments should be equal.
         output.num = true;
         output.tag = BOOL;
         if (!arity) return output;
-        auto last = (args)[0];
+        auto first = (args)[0];
         for (size_t i = 1; i < arity; i++) {
-            output.num = last == (args)[i];
+            output.num = first == (args)[i];
             if (!output.num) break;
-            last = (args)[i];
         }
         return output;
     }
-    if (!op.compare("!=") || !op.compare("neq")) {
+    if (!op.compare("neq")) {
         // All arguments should be different.
         output.num = true;
         output.tag = BOOL;
         if (!arity) return output;
-        auto last = (args)[0];
+        auto first = (args)[0];
         for (size_t i = 1; i < arity; i++) {
-            output.num = last != (args)[i];
+            output.num = first != (args)[i];
             if (!output.num) break;
-            last = (args)[i];
         }
         return output;
     }
-    if (!op.compare(">") || !op.compare("gt")) {
+    if (!op.compare("gt")) {
         // All arguments should be strictly decreasing.
+        output.tag = BOOL;
         output.num = vector_is_ordered(&args, std::greater<long>());
-        output.tag = BOOL;
         return output;
     }
-    if (!op.compare("<") || !op.compare("lt")) {
+    if (!op.compare("lt")) {
         // All arguments should be strictly increasing.
+        output.tag = BOOL;
         output.num = vector_is_ordered(&args, std::less<long>());
-        output.tag = BOOL;
         return output;
     }
-    if (!op.compare(">=") || !op.compare("geq")) {
+    if (!op.compare("geq")) {
         // All arguments should be non-strictly decreasing.
-        output.num = vector_is_ordered(&args, std::greater_equal<long>());
         output.tag = BOOL;
+        output.num = vector_is_ordered(&args, std::greater_equal<long>());
         return output;
     }
-    if (!op.compare("<=") || !op.compare("leq")) {
+    if (!op.compare("leq")) {
         // All arguments should be non-strictly increasing.
-        output.num = vector_is_ordered(&args, std::less_equal<long>());
         output.tag = BOOL;
+        output.num = vector_is_ordered(&args, std::less_equal<long>());
         return output;
     }
 
     // 2-ary numeric functions
-    if (!op.compare("-") || !op.compare("sub"))
-        return {NUM, args[0].num - args[1].num};
-    if (!op.compare("/") || !op.compare("div"))
-        return {NUM, args[0].num / args[1].num};
-    if (!op.compare("%") || !op.compare("mod"))
-        return {NUM, args[0].num % args[1].num};
+    if (!op.compare("sub")) return {NUM, args[0].num - args[1].num};
+    if (!op.compare("div")) return {NUM, args[0].num / args[1].num};
+    if (!op.compare("mod")) return {NUM, args[0].num % args[1].num};
 
-    // 1-ary functions
+    // 1-ary numeric functions
     if (!op.compare("neg")) return {NUM, -args[0].num};
-    if (!op.compare("~") || !op.compare("flip")) return {NUM, ~args[0].num};
+    if (!op.compare("flip")) return {NUM, ~args[0].num};
 
     // Results haven't been set.
     std::cout << "ExpressionEvaluationError: Could not evaluate (" << op;
@@ -1154,17 +861,16 @@ LispVar evaluate_const(std::string item) {
     LispVar output;
     bool is_function = LISP_BUILTINS.count(item);
 
-    if (is_function) {
+    if (is_function or !item.compare("expression")) {
         output.string = new std::string;
         *output.string = item;
         output.tag = BUILTIN;
-
         return output;
     }
 
-    if (!item.compare("True")) { return LispVar{BOOL, 1}; }
-    if (!item.compare("False")) { return LispVar{BOOL, 0}; }
-    if (!item.compare("Nothing")) { return LispVar{NOTHING, 0}; }
+    if (!item.compare("True")) { return {BOOL, 1}; }
+    if (!item.compare("False")) { return {BOOL, 0}; }
+    if (!item.compare("Nothing")) { return {NOTHING, 0}; }
 
     if ((item[0] == '\'' and item[item.size() - 1] == '\'')) {
         output.string = new std::string;
@@ -1175,11 +881,12 @@ LispVar evaluate_const(std::string item) {
     }
 
     try {
-        return LispVar{NUM, std::stoi(item)};
+        return {NUM, std::stoi(item)};
     } catch (const std::invalid_argument &e) {
-        std::cout << "ConstantParsingError: could not parse constant '" << item
-                  << "'.\n";
-        exit(1);
+        output.string = new std::string;
+        *output.string = item;
+        output.tag = VARIABLE;
+        return output;
     }
 }
 
@@ -1222,25 +929,34 @@ LispVar parse_and_evaluate(std::string input) {
     return evaluate_tree(&tree, 0);
 }
 
+void print_debug(std::string msg) {
+    if (DEBUG_MODE) { std::cout << "[DEBUG] " << msg; }
+}
+
 int main(int argc, char const *argv[]) {
-    if (argc != 2) {
-        std::cout
-            << "Error: Expected exactly 1 command-line argument (filename)."
-            << '\n';
+    if (argc != 3) {
+        std::cout << "Error: Expected exactly 2 command-line arguments "
+                     "(filename and debug mode)."
+                  << '\n';
         exit(1);
     }
 
-    // _fill_out_lisp_builtin_types();
+    DEBUG_MODE = std::stoi(argv[2]);
+
+    _fill_out_lisp_builtin_types();
 
     std::ifstream t(argv[1]);
     std::stringstream buffer;
     buffer << t.rdbuf();
-    auto expr = "(noop " + buffer.str() + ")";
+    auto expr = buffer.str();
+
     auto tree = parse_expression(expr);
-    std::cout << "[DEBUG] Dumping AST below:" << '\n';
-    std::cout << tree.to_str() << '\n';
-    std::cout << "[DEBUG] Done." << '\n';
-    std::cout << "[DEBUG] Evaluating AST at node 0." << '\n';
+    print_debug("Dumping AST below:\n");
+    print_debug(tree.to_str() + ":\n");
+    print_debug("Done\n");
+    print_debug("Evaluating AST at node 0.\n");
     evaluate_tree(&tree, 0);
+
+    std::cout << '\n';
     return 0;
 }
