@@ -2,20 +2,11 @@ A Lisp.
 
 # TODO
 
-- [x] Command line argument parsing
-    - [x] Read from file
-- [x] Calling functions
-    - [x] Resolve and call functions without the `call` function.
-- [x] Type matching
-- [x] Unescaping strings
-- [ ] Recompilation also calls generative.py
-
 ## Features
 
 - [ ] Union type support
 - [ ] Static type inference in Python
 - [ ] Optional typing of closures
-- [x] Floating point numbers
 - [ ] Global error stack
 - [ ] Imports
     - [ ] Possibility to define own namespaces
