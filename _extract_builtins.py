@@ -37,7 +37,7 @@ def get_types() -> str:
 
 
 if __name__ == "__main__":
-    t = get_types()
-    print(t)
+    # t = get_types()
+    # print(t)
     t = get_builtins()
-    print(t)
+    # print(t)

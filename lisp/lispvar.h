@@ -23,6 +23,7 @@ enum LispType {
     TYPE,
     EXPRESSION,
     VARIABLE,
+    CLOSURE,
     __NOT_SET__,
     __NO_ARGS__,
 };
@@ -80,9 +81,13 @@ class LispVar {
         return (this->tag == NUM || this->tag == NOTHING || this->tag == BOOL);
     }
 
+    bool is_callable() {
+        return (this->tag == BUILTIN || this->tag == CLOSURE);
+    }
+
     bool is_sized() {
         return (this->tag == STRING || this->tag == LIST ||
-                this->tag == EXPRESSION);
+                this->tag == EXPRESSION || this->tag == CLOSURE);
     }
 
     bool is_booly() {
@@ -100,7 +105,8 @@ class LispVar {
     long size() {
         if (this->tag == STRING) return this->string->size();
         if (this->tag == LIST) return this->vector->size();
-        if (this->tag == EXPRESSION) return this->tree->size();
+        if (this->tag == EXPRESSION || this->tag == CLOSURE)
+            return this->tree->size();
         _throw_does_not_implement(this->tag, "size");
     }
 

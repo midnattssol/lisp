@@ -1,67 +1,73 @@
 [
     [
-        ["mul", "add", "or", "and", "xor", "gt", "geq", "lt", "leq"], "[(map type ['*' 'numeric'])]"
+        ["mul", "add", "or", "and", "xor", "gt", "geq", "lt", "leq"], "[(map type [\"*\" \"numeric\"])]"
     ],
     [
-        ["noop", "list", "eq", "neq"], "[(map type ['*'])]"
+        ["noop", "list", "eq", "neq"], "[(map type [\"*\"])]"
     ],
     [
-        ["typeof", "symbol", "repr", "put", "help"], "[(map type ['any'])]"
+        ["typeof", "symbol", "repr", "put", "help"], "[(map type [\"any\"])]"
     ],
     [
-        ["len" , "eval"], "[(map type ['list'])]"
+        ["len" , "eval"], "[(map type [\"list\"])]"
     ],
     [
-        ["type", "resolve"], "[(map type ['string'])]"
+        ["type"], "[(map type [\"string\"])]"
     ],
     [
-        ["join"], "[(map type ['*' 'list'])]"
+        ["join"], "[(map type [\"*\" \"list\"])]"
     ],
     [
         # One numeric argument
-        ["neg", "flip"], "[(map type ['numeric'])]"
+        ["neg", "flip"], "[(map type [\"numeric\"])]"
     ],
     [
         # Two numeric arguments
-        ["mod", "sub", "div"], "[(map type ['numeric']) (map type ['numeric'])]"
+        ["mod", "sub", "div"], "[(map type [\"numeric\"]) (map type [\"numeric\"])]"
     ],
     [
-        ["range"], "[(map type ['numeric' '?']) (map type ['numeric' '?']) (map type ['numeric' '?' 'truthy'])]"
+        ["range"], "[(map type [\"numeric\" \"?\"]) (map type [\"numeric\" \"?\"]) (map type [\"numeric\" \"?\" \"truthy\"])]"
     ],
     [
-        ["insert"], "[(map type ['list']) (map type ['numeric']) (map type ['any'])]"
+        ["insert"], "[(map type [\"any\"]) (map type [\"numeric\"]) (map type [\"list\"])]"
     ],
     [
-        ["assert"], "[(map type ['booly']) (map type ['string' '?'])]"
+        ["assert"], "[(map type [\"booly\"]) (map type [\"string\" \"?\"])]"
     ],
     [
-        ["bool"], "[(map type ['booly'])]"
+        ["bool"], "[(map type [\"booly\"])]"
     ],
     [
-        ["slice"], "[(map type ['list']) (map type ['numeric']) (map type ['numeric' '?']) (map type ['numeric' '?' 'truthy'])]"
+        ["slice"], "[(map type [\"list\"]) (map type [\"numeric\"]) (map type [\"numeric\" \"?\"]) (map type [\"numeric\" \"?\" \"truthy\"])]"
     ],
     [
-        ["repeat"], "[(map type ['numeric']) (map type ['any'])]"
+        ["repeat"], "[(map type [\"numeric\"]) (map type [\"any\"])]"
     ],
     [
-        ["get"], "[(map type ['numeric']) (map type ['list'])]"
+        ["get"], "[(map type [\"numeric\"]) (map type [\"list\"])]"
     ],
     [
-        ["typematch"], "[(map type ['list']) (map type ['list'])]"
+        ["typematch"], "[(map type [\"list\"]) (map type [\"list\"])]"
     ],
     [
-        ["map"], "[(map type ['builtin']) (map type ['list' '*'])]"
+        ["map"], "[(map type [\"callable\"]) (map type [\"list\" \"*\"])]"
     ],
     [
-        ["fold"], "[(map type ['builtin']) (map type ['any']) (map type ['list'])]"
+        ["fold"], "[(map type [\"callable\"]) (map type [\"any\"]) (map type [\"list\"])]"
     ],
     [
-        ["ternary"], "[(map type ['booly']) (map type ['any']) (map type ['any'])]"
+        ["ternary"], "[(map type [\"booly\"]) (map type [\"any\"]) (map type [\"any\"])]"
     ],
     [
-        ["let"], "[(map type ['string']) (map type ['any'])]"
+        ["let"], "[(map type [\"string\"]) (map type [\"any\"])]"
     ],
     [
-        ["call"], "[(map type ['expression']) (map type ['any' '*'])]"
-    ]
+        ["call"], "[(map type [\"expression\"]) (map type [\"any\" \"*\"])]"
+    ],
+    [
+        ["closure"], "[(map type [\"expression\"])]"
+    ],
+    [
+        ["match"], "[(map type [\"string\"]) (map type [\"string\"])]"
+    ],
 ]

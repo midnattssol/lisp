@@ -7,6 +7,7 @@
 #include <iostream>
 #include <map>
 #include <numeric>
+#include <regex>
 #include <set>
 #include <sstream>
 #include <stdexcept>
@@ -36,7 +37,7 @@ const std::map<unsigned int, const std::string> TYPENAMES{
     {BUILTIN, "builtin"},
     {TYPE, "type"},
     {EXPRESSION, "expression"},
-};
+    {CLOSURE, "function"}};
 
 /* Assert that a condition is truthy, or print an error message and exit. */
 void _lisp_assert_or_exit(bool condition, std::string message) {
@@ -66,6 +67,8 @@ std::string LispVar::to_str() {
         ss << "<Type '" << *(this->string) << "'>";
     } else if (this->tag == EXPRESSION) {
         ss << this->_pretty_tree();
+    } else if (this->tag == CLOSURE) {
+        ss << this->_pretty_tree();
     } else if (this->tag == NUM)
         ss << this->num;
     else if (this->tag == NOTHING)
@@ -88,7 +91,7 @@ std::string LispVar::to_str() {
         if (!TYPENAMES.count(this->tag)) {
             std::cout << "Error: Tag " << this->tag << " not in TYPENAMES.\n";
         } else {
-            std::cout << "[CPPBug] The Lisp type" << TYPENAMES.at(this->tag)
+            std::cout << "[CPPBug] The Lisp type " << TYPENAMES.at(this->tag)
                       << " does not implement `to_str`.\n";
         }
         exit(1);
@@ -128,9 +131,9 @@ std::string LispVar::get_help_str() {
     return ss.str();
 }
 
-LispVar evaluate_builtin(LispVar op,
-                         std::vector<LispVar> args,
-                         bool safe = true);
+LispVar call_builtin(LispVar operation,
+                     std::vector<LispVar> args,
+                     bool safe = true);
 LispVar evaluate_const(std::string item);
 LispVar parse_expression(std::string expression);
 
@@ -141,12 +144,11 @@ LispVar parse_expression(std::string expression);
 }
 
 // ===| BUILTINS |===
-LispVar evaluate_tree(LispVar *expression, unsigned int index);
+LispVar evaluate_expression(LispVar *expression, unsigned int index);
 
 /* Todo: this implementation probably leaks memory like a sieve. */
-LispVar call_function(std::vector<LispVar> arguments) {
-    LispVar function = arguments[0];
-    assert(function.tag == EXPRESSION);
+LispVar call_closure(LispVar closure, std::vector<LispVar> arguments) {
+    assert(closure.tag == CLOSURE);
 
     // Function example: {{n} (+ n 10)}
     // The first branch is the arguments the function takes.
@@ -154,21 +156,20 @@ LispVar call_function(std::vector<LispVar> arguments) {
 
     // Calling a function should first increase the scope depth.
     VARIABLE_SCOPE.increment();
-
     assert(VARIABLE_SCOPE.depth < 5);
 
     // Then it should call (let argname arg) to bind the arguments
     // to the function values.
-    auto argument_names = function.tree->subtree(1);
+    auto argument_names = closure.tree->subtree(1);
     unsigned int arity = argument_names.size() - 1;
 
+    assert(arity == arguments.size());
+
     // Offset for the arity + 1 (base tree index)
-    auto function_steps = function.tree->subtree(arity + 2);
+    auto function_steps = closure.tree->subtree(arity + 2);
     for (size_t i = 1; i <= arity; i++) {
         auto a = argument_names.nodes[i];
-        auto b = arguments[i];
-        std::cout << "(variable '" << *a.string << "' was set to " << b.to_str()
-                  << ")\n";
+        auto b = arguments[i - 1];
         VARIABLE_SCOPE.set_var(a.string, b);
     }
 
@@ -180,7 +181,7 @@ LispVar call_function(std::vector<LispVar> arguments) {
     callable->tree = ptr;
     callable->tag = EXPRESSION;
 
-    auto result = evaluate_tree(callable, 0);
+    auto result = evaluate_expression(callable, 0);
     delete callable;
 
     // If it is a closure, it can get information from the surrounding
@@ -282,7 +283,7 @@ LispVar parse_expression(std::string expression) {
 
         // Keeps track of whether or not the parser is inside a string
         // literal to avoid splitting at bad times.
-        in_string_literal ^= character == '\'' && !last_was_backslash;
+        in_string_literal ^= character == '"' && !last_was_backslash;
         last_was_backslash = character == '\\';
 
         if (last_is_empty) depth_buffer = depth + !last_was_paren;
@@ -379,6 +380,8 @@ bool _types_match(std::vector<LispVar> args, LispVar expected) {
             }
 
             if (!type.string->compare("any")) {
+            } else if (!type.string->compare("callable")) {
+                matched &= arg.is_callable();
             } else if (!type.string->compare("booly")) {
                 matched &= arg.is_booly();
             } else if (!type.string->compare("truthy")) {
@@ -473,10 +476,20 @@ bool _types_match(std::vector<LispVar> args, LispVar expected) {
             expected_pointer <= expected_size);
 }
 
+LispVar call_variable(LispVar variable, std::vector<LispVar> args) {
+    if (variable.tag == BUILTIN) {
+        return call_builtin(variable, args);
+    } else if (variable.tag == CLOSURE) {
+        return call_closure(variable, args);
+    }
+
+    assert(false);
+}
+
 /* Perform an operation on the inputs. */
-LispVar evaluate_builtin(LispVar operation,
-                         std::vector<LispVar> args,
-                         bool safe) {
+LispVar call_builtin(LispVar operation, std::vector<LispVar> args, bool safe) {
+    assert(operation.tag == BUILTIN);
+
     LispVar output;
     auto arity = args.size();
     LispType kind = arity ? args[0].tag : __NOT_SET__;
@@ -501,17 +514,27 @@ LispVar evaluate_builtin(LispVar operation,
 
     // No operation.
     if (!op.compare("noop")) { return *_SINGLETON_NOTHING; }
-    if (!op.compare("call")) { return call_function(args); }
-
-    // Resolve a string into its variable value.
-    if (!op.compare("resolve")) {
-        return VARIABLE_SCOPE.get_var(args[0].string);
-    }
 
     // Bind a string to a variable value.
     if (!op.compare("let")) {
         VARIABLE_SCOPE.set_var(args[0].string, args[1]);
         return *_SINGLETON_NOTHING;
+    }
+
+    // Do regular expression matching.
+    if (!op.compare("match")) {
+        std::regex txt_regex;
+        try {
+            txt_regex = std::regex(*args[0].string);
+        } catch (std::regex_error const &) {
+            std::cout << "RegexError: " << args[0].to_repr()
+                      << " is an invalid regular expression.\n";
+            exit(1);
+        }
+
+        output.tag = BOOL;
+        output.num = std::regex_match(*args[1].string, txt_regex);
+        return output;
     }
 
     // ===| Base constructors |===
@@ -529,6 +552,11 @@ LispVar evaluate_builtin(LispVar operation,
         return output;
     }
     if (!op.compare("symbol")) return args[0];
+    if (!op.compare("closure")) {
+        output = args[0];
+        output.tag = CLOSURE;
+        return output;
+    }
 
     // ===| Help functions |===
     if (!op.compare("help")) {
@@ -557,7 +585,7 @@ LispVar evaluate_builtin(LispVar operation,
     if (!op.compare("assert")) {
         auto temp_string = "bool";
         bool success =
-            evaluate_builtin(LispVar{BUILTIN, *temp_string}, {args[0]}).num;
+            call_builtin(LispVar{BUILTIN, *temp_string}, {args[0]}).num;
         _lisp_assert_or_exit(
             success, ((arity == 2) ? *args[1].string : "AssertionError"));
         return *_SINGLETON_NOTHING;
@@ -597,13 +625,13 @@ LispVar evaluate_builtin(LispVar operation,
         }
     }
 
-    // Insert {1} at index {2} in {0}.
+    // Insert {0} at index {1} in {2}.
     if (!op.compare("insert")) {
         output.vector = new std::vector<LispVar>;
         output.tag = LIST;
 
-        auto size = args[0].size();
-        auto index = args[2].num;
+        auto size = args[2].size();
+        auto index = args[1].num;
 
         // Allows for negative indices.
         index = (index < 0) ? size + index + 1 : index;
@@ -613,10 +641,10 @@ LispVar evaluate_builtin(LispVar operation,
             "less than or equal to the size of the first argument.");
 
         for (int i = 0; i < size; i++) {
-            if (i == index) (*output.vector).push_back(args[1]);
-            (*output.vector).push_back((*args[0].vector)[i]);
+            if (i == index) (*output.vector).push_back(args[0]);
+            (*output.vector).push_back((*args[2].vector)[i]);
         }
-        if (index == size) (*output.vector).push_back(args[1]);
+        if (index == size) (*output.vector).push_back(args[0]);
         return output;
     }
 
@@ -666,7 +694,7 @@ LispVar evaluate_builtin(LispVar operation,
                 for (size_t j = 1; j < arity; j++) {
                     _vector->push_back((*args[j].vector)[i]);
                 }
-                (*output.vector).push_back(evaluate_builtin(args[0], *_vector));
+                (*output.vector).push_back(call_variable(args[0], *_vector));
                 _vector->clear();
             }
             delete _vector;
@@ -679,7 +707,7 @@ LispVar evaluate_builtin(LispVar operation,
     if (!op.compare("fold")) {
         auto accumulator = args[1];
         for (auto arg : *args[2].vector) {
-            accumulator = evaluate_builtin(args[0], {accumulator, arg});
+            accumulator = call_variable(args[0], {accumulator, arg});
         }
         return accumulator;
     }
@@ -743,18 +771,18 @@ LispVar evaluate_builtin(LispVar operation,
     }
 
     if (!op.compare("eval")) {
-        return evaluate_builtin(
+        return call_variable(
             (*args[0].vector)[0],
             {(*args[0].vector).begin() + 1, (*args[0].vector).end()});
     }
-
     // Flow control
     if (!op.compare("ternary")) {
-        auto temp_str = "bool";
-        auto result = evaluate_builtin({BUILTIN, *temp_str}, {args[0]}).num
-                          ? args[1]
-                          : args[2];
-        return result;
+        LispVar boolcaller;
+        std::string temp_str = "bool";
+        boolcaller.tag = BUILTIN;
+        boolcaller.string = &temp_str;
+        bool result = call_builtin(boolcaller, {args[0]}).num;
+        return result ? args[1] : args[2];
     }
 
     // Numeric functions
@@ -863,12 +891,11 @@ LispVar evaluate_const(std::string item) {
 
     if (!item.compare("True")) { return {BOOL, 1}; }
     if (!item.compare("False")) { return {BOOL, 0}; }
-    if (!item.compare("Nothing")) { return {NOTHING, 0}; }
+    if (!item.compare("Nothing")) { return *_SINGLETON_NOTHING; }
 
-    if ((item[0] == '\'' and item[item.size() - 1] == '\'')) {
+    if (item.size() >= 2 && item[0] == '"' && item[item.size() - 1] == '"') {
         output.string = new std::string;
-        // Removes the quotes surrounding the string literal.
-        *output.string = {item.begin() + 1, item.end() - 1};
+        *output.string = unescape_string(item);
         output.tag = STRING;
         return output;
     }
@@ -883,10 +910,20 @@ LispVar evaluate_const(std::string item) {
     }
 }
 
-/* Evaluates a tree. */
-LispVar evaluate_tree(LispVar *expression, unsigned int index) {
+/* Evaluates a tree.
+
+Function calls are defined as nodes which are not leaves.
+These are computed recursively by evaluating the leaves (constants).
+
+Note that the variable resolution takes place when they are called as leaf nodes
+in this context.
+*/
+LispVar evaluate_expression(LispVar *expression, unsigned int index) {
     auto item = expression->tree->nodes[index];
-    bool is_function = item.tag == BUILTIN;
+
+    // Resolves variables.
+    if (item.tag == VARIABLE) { item = VARIABLE_SCOPE.get_var(item.string); }
+    bool is_function = item.tag == BUILTIN || item.tag == CLOSURE;
 
     if (!is_function) return item;
 
@@ -901,7 +938,17 @@ LispVar evaluate_tree(LispVar *expression, unsigned int index) {
         return result;
     }
 
-    std::vector<LispVar> children;
+    // Allow binding to variables.
+    // This is very scuffed right now and obviously WIP.
+    if (!item.string->compare("let")) {
+        LispVar result = evaluate_expression(expression, index + 2);
+        VARIABLE_SCOPE.set_var(expression->tree->nodes[index + 1].string,
+                               result);
+
+        return result;
+    }
+
+    std::vector<LispVar> arguments;
     auto size = expression->tree->nodes.size();
     auto original_depth = expression->tree->depths[index];
 
@@ -909,17 +956,18 @@ LispVar evaluate_tree(LispVar *expression, unsigned int index) {
          (original_depth != expression->tree->depths[i]) and i < size;
          i++) {
         if ((original_depth + 1) == expression->tree->depths[i]) {
-            children.push_back(evaluate_tree(expression, i));
+            auto inner = evaluate_expression(expression, i);
+
+            arguments.push_back(inner);
         }
     }
-
-    if (children.empty()) { return item; }
-    return evaluate_builtin(item, children);
+    if (arguments.empty()) { return item; }
+    return call_variable(item, arguments);
 }
 
 LispVar parse_and_evaluate(std::string input) {
     auto tree = parse_expression(input);
-    return evaluate_tree(&tree, 0);
+    return evaluate_expression(&tree, 0);
 }
 
 void print_debug(std::string msg) {
@@ -948,7 +996,7 @@ int main(int argc, char const *argv[]) {
     print_debug(tree.to_str() + ":\n");
     print_debug("Done\n");
     print_debug("Evaluating AST at node 0.\n");
-    evaluate_tree(&tree, 0);
+    evaluate_expression(&tree, 0);
 
     std::cout << '\n';
     return 0;

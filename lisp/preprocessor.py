@@ -20,6 +20,7 @@ BASEPATH = p.Path(__file__).parent
 SIGNED_LONG_RANGE = range(-2_147_483_648, 2_147_483_648)
 
 SHORTHANDS = json_from_path(BASEPATH / "shorthands.json")
+prefix_equals = json_from_path(BASEPATH / "prefix_equals.json")
 
 _BASE_N_NUM_REGEX = "({prefix}([{nums}]+_)*[{nums}]+)"
 _BASE10_NUM = _BASE_N_NUM_REGEX.format(prefix="", nums=r"\d")
@@ -123,23 +124,43 @@ def make_canon(expr: str) -> str:
         # Recursively calls the function on child tokens.
         if expr[0] == "(" and expr[-1] == ")":
             expr = expr[1:-1]
-            canonized_tokens = list(map(make_canon, tokens_of(expr)))
-            if canonized_tokens[0] in {"=>"}:
-                canonized_tokens = [
+            canon_tokens = list(map(make_canon, tokens_of(expr)))
+
+            if canon_tokens[0] in prefix_equals:
+                if prefix_equals[canon_tokens[0]].get("rev"):
+                    canon_tokens = [
+                        "let",
+                        canon_tokens[1],
+                        f"({prefix_equals[canon_tokens[0]]['op']} "
+                        + " ".join(canon_tokens[2:])
+                        + " "
+                        + canon_tokens[1]
+                        + ")",
+                    ]
+                else:
+                    canon_tokens = [
+                        "let",
+                        canon_tokens[1],
+                        f"({prefix_equals[canon_tokens[0]]['op']} {canon_tokens[1]} "
+                        + " ".join(canon_tokens[2:])
+                        + ")",
+                    ]
+
+                canon_tokens = list(map(make_canon, canon_tokens))
+
+            if canon_tokens[0] in {"=>", "λ"}:
+                # No arguments have been provided. Fall back on _.
+                if len(canon_tokens) == 3:
+                    canon_tokens.insert(2, "{_}")
+
+                canon_tokens = [
                     "let",
-                    canonized_tokens[1],
-                    "{" + " ".join(canonized_tokens[2:]) + "}",
+                    canon_tokens[1],
+                    "(closure {" + " ".join(canon_tokens[2:]) + "})",
                 ]
-                canonized_tokens = list(map(make_canon, canonized_tokens))
+                canon_tokens = list(map(make_canon, canon_tokens))
 
-            if canonized_tokens[0] in {"let", "resolve"} and len(canonized_tokens) >= 2:
-                if not (
-                    canonized_tokens[1].startswith("'")
-                    and canonized_tokens[1].startswith("'")
-                ):
-                    canonized_tokens[1] = "'" + canonized_tokens[1] + "'"
-
-            return "(" + " ".join(canonized_tokens) + ")"
+            return "(" + " ".join(canon_tokens) + ")"
 
     # Canonicalizes ranges.
     if 1 <= expr.count(":") <= 3:

@@ -27,6 +27,7 @@ def get_code():
     )
 
     for i, (builtins, signature) in enumerate(signatures):
+        signature = signature.replace('"', '\\"')
         varname = f"type_{i}"
         code += f"auto {varname} = new LispVar;\n"
         code += f'*{varname} = parse_and_evaluate("{signature}");\n'
