@@ -1,5 +1,8 @@
+#include <math.h>
+
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
@@ -7,6 +10,7 @@
 #include <iostream>
 #include <map>
 #include <numeric>
+#include <random>
 #include <regex>
 #include <set>
 #include <sstream>
@@ -19,25 +23,7 @@
 #include "./scoping.h"
 
 bool DEBUG_MODE;
-
-// ===| FORWARD DECLARATIONS |===
-
-void _lisp_assert_or_exit(bool condition, std::string message);
-[[noreturn]] void _throw_does_not_implement(LispType type,
-                                            std::string notimplemented);
-
-// ===| STRUCTS |===
-
-const std::map<unsigned int, const std::string> TYPENAMES{
-    {NUM, "num"},
-    {STRING, "string"},
-    {LIST, "list"},
-    {NOTHING, "nothing"},
-    {BOOL, "bool"},
-    {BUILTIN, "builtin"},
-    {TYPE, "type"},
-    {EXPRESSION, "expression"},
-    {CLOSURE, "function"}};
+std::mt19937 RNG;
 
 /* Assert that a condition is truthy, or print an error message and exit. */
 void _lisp_assert_or_exit(bool condition, std::string message) {
@@ -46,10 +32,18 @@ void _lisp_assert_or_exit(bool condition, std::string message) {
         exit(1);
     }
 }
+
+/* Display an error message that a type does not implement something. */
 [[noreturn]] void _throw_does_not_implement(LispType type,
                                             std::string notimplemented) {
-    std::cout << "LispType '" << TYPENAMES.at(type) << "' does not implement `"
-              << notimplemented << "`.";
+    std::cout << "[UnimplementedError] LispType '" << TYPENAMES.at(type)
+              << "' does not implement `" << notimplemented << "`.";
+    exit(1);
+}
+
+[[noreturn]] void _throw_could_not_cast(LispVar expected, LispVar actual) {
+    std::cout << "[CastingError] Could not cast `" << actual.to_str()
+              << "` to signature `" << expected.to_str() << "`.";
     exit(1);
 }
 
@@ -69,8 +63,8 @@ std::string LispVar::to_str() {
         ss << this->_pretty_tree();
     } else if (this->tag == CLOSURE) {
         ss << this->_pretty_tree();
-    } else if (this->tag == NUM)
-        ss << this->num;
+    } else if (this->tag == NUM || this->tag == FLOAT)
+        ss << PNUMPART(this);
     else if (this->tag == NOTHING)
         ss << "Nothing";
     else if (this->tag == __NO_ARGS__)
@@ -91,8 +85,7 @@ std::string LispVar::to_str() {
         if (!TYPENAMES.count(this->tag)) {
             std::cout << "Error: Tag " << this->tag << " not in TYPENAMES.\n";
         } else {
-            std::cout << "[CPPBug] The Lisp type " << TYPENAMES.at(this->tag)
-                      << " does not implement `to_str`.\n";
+            _throw_does_not_implement(this->tag, "to_str");
         }
         exit(1);
     }
@@ -124,8 +117,7 @@ std::string LispVar::get_help_str() {
             std::cout << "Error: Tag " << this->tag << " not in TYPENAMES.\n"
                       << '\n';
         } else
-            std::cout << "[CPPBug] The Lisp type" << TYPENAMES.at(this->tag)
-                      << " does not implement `get_help_str`.\n";
+            _throw_does_not_implement(this->tag, "get_help_str");
         exit(1);
     }
     return ss.str();
@@ -134,64 +126,12 @@ std::string LispVar::get_help_str() {
 LispVar call_builtin(LispVar operation,
                      std::vector<LispVar> args,
                      bool safe = true);
+LispVar call_closure(LispVar operation, std::vector<LispVar> args);
 LispVar evaluate_const(std::string item);
 LispVar parse_expression(std::string expression);
 
-[[noreturn]] void _throw_could_not_cast(LispVar expected, LispVar actual) {
-    std::cout << "[casting error] Could not cast `" << actual.to_str()
-              << "` to signature `" << expected.to_str() << "`.";
-    exit(1);
-}
-
 // ===| BUILTINS |===
 LispVar evaluate_expression(LispVar *expression, unsigned int index);
-
-/* Todo: this implementation probably leaks memory like a sieve. */
-LispVar call_closure(LispVar closure, std::vector<LispVar> arguments) {
-    assert(closure.tag == CLOSURE);
-
-    // Function example: {{n} (+ n 10)}
-    // The first branch is the arguments the function takes.
-    // The second is an expression to execute.
-
-    // Calling a function should first increase the scope depth.
-    VARIABLE_SCOPE.increment();
-    assert(VARIABLE_SCOPE.depth < 5);
-
-    // Then it should call (let argname arg) to bind the arguments
-    // to the function values.
-    auto argument_names = closure.tree->subtree(1);
-    unsigned int arity = argument_names.size() - 1;
-
-    assert(arity == arguments.size());
-
-    // Offset for the arity + 1 (base tree index)
-    auto function_steps = closure.tree->subtree(arity + 2);
-    for (size_t i = 1; i <= arity; i++) {
-        auto a = argument_names.nodes[i];
-        auto b = arguments[i - 1];
-        VARIABLE_SCOPE.set_var(a.string, b);
-    }
-
-    // Then, it should evaluate the function.
-    auto callable = new LispVar;
-    auto ptr = new Tree<LispVar>;
-    *ptr = function_steps;
-
-    callable->tree = ptr;
-    callable->tag = EXPRESSION;
-
-    auto result = evaluate_expression(callable, 0);
-    delete callable;
-
-    // If it is a closure, it can get information from the surrounding
-    // scope. If it is a pure function, it can't. This should be checked and
-    // enforced by the Python code.
-
-    // Finally, the scope should be exited and cleaned up.
-    VARIABLE_SCOPE.decrement();
-    return result;
-}
 
 /* Parse a Lisp expression into a tree. */
 LispVar parse_expression(std::string expression) {
@@ -486,13 +426,66 @@ LispVar call_variable(LispVar variable, std::vector<LispVar> args) {
     assert(false);
 }
 
+/* Call a closure on the inputs. */
+LispVar call_closure(LispVar closure, std::vector<LispVar> arguments) {
+    assert(closure.tag == CLOSURE);
+
+    // Function example: {{n} (+ n 10)}
+    // The first branch is the arguments the function takes.
+    // The second is an expression to execute.
+
+    // Calling a function should first increase the scope depth.
+    VARIABLE_SCOPE.increment();
+    assert(VARIABLE_SCOPE.depth < 5);
+
+    // Then it should call (let argname arg) to bind the arguments
+    // to the function values.
+    auto argument_names = closure.tree->subtree(1);
+    unsigned int arity = argument_names.size() - 1;
+
+    assert(arity == arguments.size());
+
+    // Offset for the arity + 1 (base tree index)
+    auto function_steps = closure.tree->subtree(arity + 2);
+    for (size_t i = 1; i <= arity; i++) {
+        auto a = argument_names.nodes[i];
+        auto b = arguments[i - 1];
+        VARIABLE_SCOPE.set_var(a.string, b);
+    }
+
+    // Then, it should evaluate the function.
+    auto callable = new LispVar;
+    auto ptr = new Tree<LispVar>;
+    *ptr = function_steps;
+
+    callable->tree = ptr;
+    callable->tag = EXPRESSION;
+
+    auto result = evaluate_expression(callable, 0);
+    delete callable;
+
+    // If it is a closure, it can get information from the surrounding
+    // scope. If it is a pure function, it can't. This should be checked and
+    // enforced by the Python code.
+
+    // Finally, the scope should be exited and cleaned up.
+    VARIABLE_SCOPE.decrement();
+    return result;
+}
+
 /* Perform an operation on the inputs. */
 LispVar call_builtin(LispVar operation, std::vector<LispVar> args, bool safe) {
     assert(operation.tag == BUILTIN);
 
     LispVar output;
     auto arity = args.size();
+
+    // Set the kind to be the type of all arguments, if they are the same.
     LispType kind = arity ? args[0].tag : __NOT_SET__;
+    for (size_t i = 1; i < arity; i++) {
+        kind = args[i].tag == kind ? kind : __NOT_SET__;
+    }
+
     auto op = *operation.string;
     if (arity == 1 && args[0] == *_SINGLETON_NOARGS_TOKEN) args = {};
 
@@ -514,6 +507,19 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args, bool safe) {
 
     // No operation.
     if (!op.compare("noop")) { return *_SINGLETON_NOTHING; }
+    if (!op.compare("do")) { return args[arity - 1]; }
+
+    // Generate a list of random numbers.
+    if (!op.compare("rand")) {
+        output.vector = new std::vector<LispVar>;
+        for (int i = 0; i < args[0].num; i++) {
+            // Using the mod here fixes the casting.
+            long num = RNG() % (1 << 16);
+            output.vector->push_back({NUM, num});
+        }
+        output.tag = LIST;
+        return output;
+    }
 
     // Bind a string to a variable value.
     if (!op.compare("let")) {
@@ -787,28 +793,39 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args, bool safe) {
 
     // Numeric functions
     if (!op.compare("add")) {
-        output.tag = NUM;
-        output.num = accumulate(&args, 0, std::plus<long>());
-        return output;
+        if (kind == NUM) {
+            output.tag = NUM;
+            output.num = accumulate_l(&args, 0, std::plus<long>());
+            return output;
+        } else {
+            output.tag = FLOAT;
+            output.flt = accumulate_f(&args, 0, std::plus<float>());
+        }
     }
     if (!op.compare("mul")) {
-        output.tag = NUM;
-        output.num = accumulate(&args, 1, std::multiplies<long>());
-        return output;
+        if (kind == NUM) {
+            output.tag = NUM;
+            output.num = accumulate_l(&args, 1, std::multiplies<long>());
+            return output;
+        } else {
+            output.tag = FLOAT;
+            output.flt = accumulate_f(&args, 1, std::multiplies<float>());
+            return output;
+        }
     }
     if (!op.compare("and")) {
         output.tag = NUM;
-        output.num = accumulate(&args, ~0, std::bit_and<long>());
+        output.num = accumulate_l(&args, ~0, std::bit_and<long>());
         return output;
     }
     if (!op.compare("or")) {
         output.tag = NUM;
-        output.num = accumulate(&args, 0, std::bit_or<long>());
+        output.num = accumulate_l(&args, 0, std::bit_or<long>());
         return output;
     }
     if (!op.compare("xor")) {
         output.tag = NUM;
-        output.num = accumulate(&args, 0, std::bit_xor<long>());
+        output.num = accumulate_l(&args, 0, std::bit_xor<long>());
         return output;
     }
     if (!op.compare("eq")) {
@@ -838,35 +855,59 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args, bool safe) {
     if (!op.compare("gt")) {
         // All arguments should be strictly decreasing.
         output.tag = BOOL;
-        output.num = vector_is_ordered(&args, std::greater<long>());
+        output.num = vector_is_ordered(&args, std::greater<float>());
         return output;
     }
     if (!op.compare("lt")) {
         // All arguments should be strictly increasing.
         output.tag = BOOL;
-        output.num = vector_is_ordered(&args, std::less<long>());
+        output.num = vector_is_ordered(&args, std::less<float>());
         return output;
     }
     if (!op.compare("geq")) {
         // All arguments should be non-strictly decreasing.
         output.tag = BOOL;
-        output.num = vector_is_ordered(&args, std::greater_equal<long>());
+        output.num = vector_is_ordered(&args, std::greater_equal<float>());
         return output;
     }
     if (!op.compare("leq")) {
         // All arguments should be non-strictly increasing.
         output.tag = BOOL;
-        output.num = vector_is_ordered(&args, std::less_equal<long>());
+        output.num = vector_is_ordered(&args, std::less_equal<float>());
         return output;
     }
 
     // 2-ary numeric functions
-    if (!op.compare("sub")) return {NUM, args[0].num - args[1].num};
-    if (!op.compare("div")) return {NUM, args[0].num / args[1].num};
-    if (!op.compare("mod")) return {NUM, args[0].num % args[1].num};
+    if (!op.compare("sub")) {
+        if (args[0].tag == NUM && args[1].tag == NUM) {
+            return {NUM, args[0].num - args[1].num};
+        } else {
+            output.tag = FLOAT;
+            output.flt = NUMPART(args[0]) - NUMPART(args[1]);
+            return output;
+        }
+    }
+    if (!op.compare("div")) {
+        output.tag = FLOAT;
+        output.flt = NUMPART(args[0]) / NUMPART(args[1]);
+        return output;
+    }
+    if (!op.compare("mod")) {
+        output.tag = FLOAT;
+        output.flt = std::fmod(NUMPART(args[0]), NUMPART(args[1]));
+        return output;
+    }
 
     // 1-ary numeric functions
-    if (!op.compare("neg")) return {NUM, -args[0].num};
+    if (!op.compare("neg")) {
+        output.tag = args[0].tag;
+        if (output.tag == NUM)
+            output.num = -args[0].num;
+        else
+            output.flt = -args[0].flt;
+        return output;
+    }
+
     if (!op.compare("flip")) return {NUM, ~args[0].num};
 
     // Results haven't been set.
@@ -901,7 +942,15 @@ LispVar evaluate_const(std::string item) {
     }
 
     try {
-        return {NUM, std::stoi(item)};
+        if (item.find('.') != std::string::npos) {
+            // Floats
+            output.tag = FLOAT;
+            output.flt = std::stold(item);
+            return output;
+        } else {
+            // Integers
+            return {NUM, std::stoi(item)};
+        }
     } catch (const std::invalid_argument &e) {
         output.string = new std::string;
         *output.string = item;
@@ -982,7 +1031,10 @@ int main(int argc, char const *argv[]) {
         exit(1);
     }
 
+    auto since_epoch = std::chrono::system_clock::now().time_since_epoch();
+
     DEBUG_MODE = std::stoi(argv[2]);
+    RNG = std::mt19937(since_epoch.count());
 
     _fill_out_lisp_builtin_types();
 

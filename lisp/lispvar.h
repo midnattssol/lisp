@@ -5,7 +5,9 @@ The singletons are the following:
 - _SINGLETON_NOT_SET
 - _SINGLETON_NOARGS_TOKEN
 */
+#include <cassert>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -13,8 +15,12 @@ The singletons are the following:
 #include "escape.h"
 #include "tree.h"
 
+#define NUMPART(a) (a.tag == NUM ? a.num : a.flt)
+#define PNUMPART(a) (a->tag == NUM ? a->num : a->flt)
+
 enum LispType {
     NUM,
+    FLOAT,
     STRING,
     LIST,
     NOTHING,
@@ -37,6 +43,7 @@ class LispVar {
     LispType tag;
     union {
         long int num;                  // Used by NUM, NOTHING and BOOL.
+        float flt;                     // Used by FLOAT.
         std::string *string;           // Used by STRING, TOKEN and TYPE.
         std::vector<LispVar> *vector;  // Used by LIST, VECTOR, and SOMETHING.
         Tree<LispVar> *tree;           // Used by EXPRESSION to store code.
@@ -49,7 +56,7 @@ class LispVar {
         // If it's a singleton, tags being the same imply that the objects are
         // the same.
         if (this->is_singleton()) return true;
-        if (this->is_numeric()) { return this->num == var.num; }
+        if (this->is_numeric()) { return PNUMPART(this) == NUMPART(var); }
         if (this->tag == STRING or this->tag == BUILTIN)
             return !(*this->string).compare(*var.string);
 
@@ -78,7 +85,8 @@ class LispVar {
     }
 
     bool is_numeric() {
-        return (this->tag == NUM || this->tag == NOTHING || this->tag == BOOL);
+        return (this->tag == NUM || this->tag == NOTHING || this->tag == BOOL ||
+                this->tag == FLOAT);
     }
 
     bool is_callable() {
@@ -92,11 +100,12 @@ class LispVar {
 
     bool is_booly() {
         return (this->tag == NUM || this->tag == NOTHING || this->tag == BOOL ||
-                this->is_sized());
+                this->tag == FLOAT || this->is_sized());
     }
 
     bool truthiness() {
-        if (this->tag == NUM or this->tag == NOTHING or this->tag == BOOL)
+        if (this->tag == NUM || this->tag == NOTHING || this->tag == BOOL ||
+            this->tag == FLOAT)
             return this->num;
         if (this->is_sized()) return this->size();
         _throw_does_not_implement(this->tag, "truthiness");
@@ -108,6 +117,18 @@ class LispVar {
         if (this->tag == EXPRESSION || this->tag == CLOSURE)
             return this->tree->size();
         _throw_does_not_implement(this->tag, "size");
+    }
+
+    /* Cast to float. */
+    float to_f() {
+        assert(this->is_numeric());
+        return PNUMPART(this);
+    }
+
+    /* Cast to long. */
+    long to_l() {
+        assert(this->is_numeric());
+        return PNUMPART(this);
     }
 
     std::string to_repr() {
@@ -161,3 +182,15 @@ LispVar parse_and_evaluate(std::string input);
 auto _SINGLETON_NOTHING = new LispVar;
 auto _SINGLETON_NOT_SET = new LispVar;
 auto _SINGLETON_NOARGS_TOKEN = new LispVar;
+
+const std::map<unsigned int, const std::string> TYPENAMES{
+    {NUM, "num"},
+    {STRING, "string"},
+    {FLOAT, "float"},
+    {LIST, "list"},
+    {NOTHING, "nothing"},
+    {BOOL, "bool"},
+    {BUILTIN, "builtin"},
+    {TYPE, "type"},
+    {EXPRESSION, "expression"},
+    {CLOSURE, "function"}};

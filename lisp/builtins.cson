@@ -1,73 +1,43 @@
-[
-    [
-        ["mul", "add", "or", "and", "xor", "gt", "geq", "lt", "leq"], "[(map type [\"*\" \"numeric\"])]"
-    ],
-    [
-        ["noop", "list", "eq", "neq"], "[(map type [\"*\"])]"
-    ],
-    [
-        ["typeof", "symbol", "repr", "put", "help"], "[(map type [\"any\"])]"
-    ],
-    [
-        ["len" , "eval"], "[(map type [\"list\"])]"
-    ],
-    [
-        ["type"], "[(map type [\"string\"])]"
-    ],
-    [
-        ["join"], "[(map type [\"*\" \"list\"])]"
-    ],
-    [
-        # One numeric argument
-        ["neg", "flip"], "[(map type [\"numeric\"])]"
-    ],
-    [
-        # Two numeric arguments
-        ["mod", "sub", "div"], "[(map type [\"numeric\"]) (map type [\"numeric\"])]"
-    ],
-    [
-        ["range"], "[(map type [\"numeric\" \"?\"]) (map type [\"numeric\" \"?\"]) (map type [\"numeric\" \"?\" \"truthy\"])]"
-    ],
-    [
-        ["insert"], "[(map type [\"any\"]) (map type [\"numeric\"]) (map type [\"list\"])]"
-    ],
-    [
-        ["assert"], "[(map type [\"booly\"]) (map type [\"string\" \"?\"])]"
-    ],
-    [
-        ["bool"], "[(map type [\"booly\"])]"
-    ],
-    [
-        ["slice"], "[(map type [\"list\"]) (map type [\"numeric\"]) (map type [\"numeric\" \"?\"]) (map type [\"numeric\" \"?\" \"truthy\"])]"
-    ],
-    [
-        ["repeat"], "[(map type [\"numeric\"]) (map type [\"any\"])]"
-    ],
-    [
-        ["get"], "[(map type [\"numeric\"]) (map type [\"list\"])]"
-    ],
-    [
-        ["typematch"], "[(map type [\"list\"]) (map type [\"list\"])]"
-    ],
-    [
-        ["map"], "[(map type [\"callable\"]) (map type [\"list\" \"*\"])]"
-    ],
-    [
-        ["fold"], "[(map type [\"callable\"]) (map type [\"any\"]) (map type [\"list\"])]"
-    ],
-    [
-        ["ternary"], "[(map type [\"booly\"]) (map type [\"any\"]) (map type [\"any\"])]"
-    ],
-    [
-        ["let"], "[(map type [\"string\"]) (map type [\"any\"])]"
-    ],
-    [
-        ["call"], "[(map type [\"expression\"]) (map type [\"any\" \"*\"])]"
-    ],
-    [
-        ["closure"], "[(map type [\"expression\"])]"
-    ],
-    [
-        ["match"], "[(map type [\"string\"]) (map type [\"string\"])]"
-    ],
-]
+mul       : ['[(map type [\"*\" \"numeric\"])]'                                                                                          , "num"]
+rand      : ['[(map type [\"numeric\"])]'                                                                                                , "list"]
+add       : ['[(map type [\"*\" \"numeric\"])]'                                                                                          , "num"]
+or        : ['[(map type [\"*\" \"numeric\"])]'                                                                                          , "num"]
+and       : ['[(map type [\"*\" \"numeric\"])]'                                                                                          , "num"]
+xor       : ['[(map type [\"*\" \"numeric\"])]'                                                                                          , "num"]
+gt        : ['[(map type [\"*\" \"numeric\"])]'                                                                                          , "bool"]
+geq       : ['[(map type [\"*\" \"numeric\"])]'                                                                                          , "bool"]
+lt        : ['[(map type [\"*\" \"numeric\"])]'                                                                                          , "bool"]
+leq       : ['[(map type [\"*\" \"numeric\"])]'                                                                                          , "bool"]
+noop      : ['[(map type [\"*\"])]'                                                                                                      , "nothing"]
+list      : ['[(map type [\"*\"])]'                                                                                                      , "list"]
+eq        : ['[(map type [\"*\"])]'                                                                                                      , "bool"]
+neq       : ['[(map type [\"*\"])]'                                                                                                      , "bool"]
+typeof    : ['[(map type [\"any\"])]'                                                                                                    , "type"]
+symbol    : ['[(map type [\"any\"])]'                                                                                                    , "any"]
+repr      : ['[(map type [\"any\"])]'                                                                                                    , "string"]
+put       : ['[(map type [\"any\"])]'                                                                                                    , "nothing"]
+help      : ['[(map type [\"any\"])]'                                                                                                    , "string"]
+len       : ['[(map type [\"list\"])]'                                                                                                   , "num"]
+eval      : ['[(map type [\"list\"])]'                                                                                                   , "any"]
+type      : ['[(map type [\"string\"])]'                                                                                                 , "type"]
+join      : ['[(map type [\"*\" \"list\"])]'                                                                                             , "list"]
+neg       : ['[(map type [\"numeric\"])]'                                                                                                , "num"]
+flip      : ['[(map type [\"numeric\"])]'                                                                                                , "num"]
+mod       : ['[(map type [\"numeric\"]) (map type [\"numeric\"])]'                                                                       , "num"]
+sub       : ['[(map type [\"numeric\"]) (map type [\"numeric\"])]'                                                                       , "num"]
+div       : ['[(map type [\"numeric\"]) (map type [\"numeric\"])]'                                                                       , "num"]
+range     : ['[(map type [\"numeric\" \"?\"]) (map type [\"numeric\" \"?\"]) (map type [\"numeric\" \"?\" \"truthy\"])]'                 , "list"]
+insert    : ['[(map type [\"any\"]) (map type [\"numeric\"]) (map type [\"list\"])]'                                                     , "list"]
+assert    : ['[(map type [\"booly\"]) (map type [\"string\" \"?\"])]'                                                                    , "nothing"]
+bool      : ['[(map type [\"booly\"])]'                                                                                                  , "bool"]
+slice     : ['[(map type [\"list\"]) (map type [\"numeric\"]) (map type [\"numeric\" \"?\"]) (map type [\"numeric\" \"?\" \"truthy\"])]' , "list"]
+repeat    : ['[(map type [\"numeric\"]) (map type [\"any\"])]'                                                                           , "list"]
+get       : ['[(map type [\"numeric\"]) (map type [\"list\"])]'                                                                          , "any"]
+typematch : ['[(map type [\"list\"]) (map type [\"list\"])]'                                                                             , "bool"]
+map       : ['[(map type [\"callable\"]) (map type [\"list\" \"*\"])]'                                                                   , "list"]
+fold      : ['[(map type [\"callable\"]) (map type [\"any\"]) (map type [\"list\"])]'                                                    , "any"]
+ternary   : ['[(map type [\"booly\"]) (map type [\"any\"]) (map type [\"any\"])]'                                                        , "any"]
+let       : ['[(map type [\"string\"]) (map type [\"any\"])]'                                                                            , "any"]
+call      : ['[(map type [\"expression\"]) (map type [\"any\" \"*\"])]'                                                                  , "any"]
+closure   : ['[(map type [\"expression\"])]'                                                                                             , "closure"]
+match     : ['[(map type [\"string\"]) (map type [\"string\"])]'                                                                         , "bool"]

@@ -2,11 +2,15 @@
 """Generate some code."""
 import cson
 import more_itertools as mit
+import pathlib as p
+
+
+BASEPATH = p.Path(__file__).parent
 
 
 def get_code():
     """Get the code."""
-    with open("builtins.cson", "r", encoding="utf-8") as file:
+    with open(BASEPATH / "builtins.cson", "r", encoding="utf-8") as file:
         content = file.read()
 
     signatures = cson.loads(content)
@@ -26,14 +30,12 @@ def get_code():
         "*_SINGLETON_NOARGS_TOKEN = {__NO_ARGS__, 0};\n"
     )
 
-    for i, (builtins, signature) in enumerate(signatures):
+    for i, (builtin, (signature, *_)) in enumerate(signatures.items()):
         signature = signature.replace('"', '\\"')
         varname = f"type_{i}"
         code += f"auto {varname} = new LispVar;\n"
         code += f'*{varname} = parse_and_evaluate("{signature}");\n'
-
-        for builtin in builtins:
-            code += f'BUILTINS_TYPES["{builtin}"] = {varname};\n'
+        code += f'BUILTINS_TYPES["{builtin}"] = {varname};\n'
 
     code += "BUILTINS_TYPES_READY = true;\n}\n"
 
@@ -41,7 +43,7 @@ def get_code():
         "const std::set<std::string> LISP_BUILTINS = {"
         + ",\n".join(
             sorted(
-                mit.collapse((f'"{i}"' for i in b) for b, s in signatures),
+                (f'"{builtin}"' for builtin in signatures),
                 key=lambda x: (len(x), x),
             )
         )
@@ -52,7 +54,7 @@ def get_code():
 
 def main():
     """Write the code."""
-    with open("gen.h", "w", encoding="utf-8") as file:
+    with open(BASEPATH / "gen.h", "w", encoding="utf-8") as file:
         file.write(get_code())
 
 

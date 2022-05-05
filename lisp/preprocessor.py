@@ -12,15 +12,15 @@ import string
 import typing as t
 
 import regex as re
-from utils import bool2sign, composed_with, fullmatch, json_from_path
+import utils
 
 # ===| Globals |===
 
 BASEPATH = p.Path(__file__).parent
 SIGNED_LONG_RANGE = range(-2_147_483_648, 2_147_483_648)
 
-SHORTHANDS = json_from_path(BASEPATH / "shorthands.json")
-prefix_equals = json_from_path(BASEPATH / "prefix_equals.json")
+SHORTHANDS = utils.json_from_path(BASEPATH / "shorthands.json")
+MODIFY_IN_PLACE = utils.json_from_path(BASEPATH / "prefix_equals.json")
 
 _BASE_N_NUM_REGEX = "({prefix}([{nums}]+_)*[{nums}]+)"
 _BASE10_NUM = _BASE_N_NUM_REGEX.format(prefix="", nums=r"\d")
@@ -42,6 +42,8 @@ NUMBER_REGEX = re.compile(
     + "(" + _BASE10_NUM + "e" + _BASE10_NUM + ")" + ")",
     re.VERBOSE | re.IGNORECASE,
 )
+
+FLOAT_REGEX = re.compile("(" + _BASE10_NUM[1:-1] + r"\.(\d*)" + r")|(\.\d+)")
 
 # ===| Functions |===
 
@@ -85,7 +87,7 @@ def postparse(expr: t.Any) -> str:
 
 
 def _make_range_canon(expr: str) -> str:
-    """Make a range canon."""
+    """Make a shorthand range written with colon separation canon."""
     result = expr.split(":")
     while len(result) < 3:
         result.append("")
@@ -101,7 +103,77 @@ def _make_range_canon(expr: str) -> str:
     return make_canon("(range " + " ".join(result) + ")")
 
 
-@composed_with(postparse)
+def _make_function_canon(expr: str) -> str:
+    """Recursively canonize child tokens.
+
+    Also performs expansions of lambda shorthands and in-place operators.
+    """
+    expr = expr[1:-1]
+    canon_tokens = list(map(make_canon, tokens_of(expr)))
+
+    if canon_tokens[0] in MODIFY_IN_PLACE:
+        if MODIFY_IN_PLACE[canon_tokens[0]].get("rev"):
+            canon_tokens = [
+                "let",
+                canon_tokens[1],
+                f"({MODIFY_IN_PLACE[canon_tokens[0]]['op']} "
+                + " ".join(canon_tokens[2:])
+                + " "
+                + canon_tokens[1]
+                + ")",
+            ]
+        else:
+            canon_tokens = [
+                "let",
+                canon_tokens[1],
+                f"({MODIFY_IN_PLACE[canon_tokens[0]]['op']} {canon_tokens[1]} "
+                + " ".join(canon_tokens[2:])
+                + ")",
+            ]
+
+        canon_tokens = list(map(make_canon, canon_tokens))
+
+    if canon_tokens[0] in {"=>", "λ"}:
+        # No arguments have been provided. Fall back on _.
+        if len(canon_tokens) == 3:
+            canon_tokens.insert(2, "{_}")
+
+        canon_tokens = [
+            "let",
+            canon_tokens[1],
+            "(closure {" + " ".join(canon_tokens[2:]) + "})",
+        ]
+        canon_tokens = list(map(make_canon, canon_tokens))
+
+    return "(" + " ".join(canon_tokens) + ")"
+
+
+def _get_numeric_or_none(expr: str) -> t.Optional[t.Union[int, float]]:
+    """Get a numeric value if the expression is numeric. Otherwise, return None."""
+    if utils.fullmatch(FLOAT_REGEX, expr):
+        return float(expr)
+
+    # Canonicalizes numbers of other bases.
+    for base_str, base in BASES.items():
+        if match := re.match(r"-?" + base_str, expr):
+            match_length = len(match.group())
+            if match_length >= 2:
+                result = int(expr[match_length:], base)
+                result *= utils.bool2sign(expr[0] != "-")
+                return result
+
+    # Canonicalizes numbers in scientific notation.
+    if utils.fullmatch(r"[+-]?\d+e[+-]?\d+", expr, re.IGNORECASE):
+        num, exp = map(int, re.split(r"[eE]", expr))
+        return num * 10**exp
+
+    if utils.fullmatch(NUMBER_REGEX, expr):
+        return int(expr)
+
+    return None
+
+
+@utils.composed_with(postparse)
 def make_canon(expr: str) -> str:
     """Make an expression canon."""
     expr = expr.strip()
@@ -116,71 +188,27 @@ def make_canon(expr: str) -> str:
     if len(expr) >= 2:
         # Canonicalizes shorthand brackets.
         if expr[0] == "{" and expr[-1] == "}":
-            return make_canon("(expression " + expr[1:-1] + ")")
+            expr = "(expression " + expr[1:-1] + ")"
+            return make_canon(expr)
 
         if expr[0] == "[" and expr[-1] == "]":
-            return make_canon("(list " + expr[1:-1] + ")")
+            expr = "(list " + expr[1:-1] + ")"
+            return make_canon(expr)
 
-        # Recursively calls the function on child tokens.
         if expr[0] == "(" and expr[-1] == ")":
-            expr = expr[1:-1]
-            canon_tokens = list(map(make_canon, tokens_of(expr)))
-
-            if canon_tokens[0] in prefix_equals:
-                if prefix_equals[canon_tokens[0]].get("rev"):
-                    canon_tokens = [
-                        "let",
-                        canon_tokens[1],
-                        f"({prefix_equals[canon_tokens[0]]['op']} "
-                        + " ".join(canon_tokens[2:])
-                        + " "
-                        + canon_tokens[1]
-                        + ")",
-                    ]
-                else:
-                    canon_tokens = [
-                        "let",
-                        canon_tokens[1],
-                        f"({prefix_equals[canon_tokens[0]]['op']} {canon_tokens[1]} "
-                        + " ".join(canon_tokens[2:])
-                        + ")",
-                    ]
-
-                canon_tokens = list(map(make_canon, canon_tokens))
-
-            if canon_tokens[0] in {"=>", "λ"}:
-                # No arguments have been provided. Fall back on _.
-                if len(canon_tokens) == 3:
-                    canon_tokens.insert(2, "{_}")
-
-                canon_tokens = [
-                    "let",
-                    canon_tokens[1],
-                    "(closure {" + " ".join(canon_tokens[2:]) + "})",
-                ]
-                canon_tokens = list(map(make_canon, canon_tokens))
-
-            return "(" + " ".join(canon_tokens) + ")"
+            return _make_function_canon(expr)
 
     # Canonicalizes ranges.
     if 1 <= expr.count(":") <= 3:
         result = expr.split(":")
-        if any(result) and all(not i or fullmatch(NUMBER_REGEX, i) for i in result):
+        if any(result) and all(
+            not i or utils.fullmatch(NUMBER_REGEX, i) for i in result
+        ):
             return _make_range_canon(expr)
 
-    # Canonicalizes numbers of other bases.
-    for base_str, base in BASES.items():
-        if match := re.match(r"-?" + base_str, expr):
-            match_length = len(match.group())
-            if match_length >= 2:
-                result = int(expr[match_length:], base)
-                result *= bool2sign(expr[0] != "-")
-                return result
-
-    # Canonicalizes numbers in scientific notation.
-    if fullmatch(r"[+-]?\d+e[+-]?\d+", expr, re.IGNORECASE):
-        num, exp = map(int, re.split(r"[eE]", expr))
-        return num * 10**exp
+    numeric = _get_numeric_or_none(expr)
+    if numeric is not None:
+        return numeric
 
     return expr
 

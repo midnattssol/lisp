@@ -8,9 +8,14 @@ import typing as t
 import regex as re
 
 
+def hash_file(path: p.Path):
+    """Hash a file."""
+    return hashlib.md5(cat(path).encode("utf-8")).hexdigest()
+
+
 def has_changed(path: p.Path, hash_path: p.Path) -> t.Union[bool, str]:
     """Return False if the hash is the same or the new hash otherwise."""
-    digest = hashlib.md5(cat(path).encode("utf-8")).hexdigest()
+    digest = hash_file(path)
     if digest == cat(hash_path):
         return False
     return digest
@@ -37,13 +42,14 @@ def fullmatch(pattern, string, *args, **kwargs):
 def composed_with(outer):
     """Decorate a function to compose it with another one."""
 
-    def inner_0(function):
-        def inner_1(*args, **kwargs):
-            return outer(function(*args, **kwargs))
+    def decorator(function):
+        return after(outer, function)
 
-        return inner_1
+    return decorator
 
-    return inner_0
+
+def after(f, g):
+    return lambda *args, **kwargs: f(g(*args, **kwargs))
 
 
 def bool2sign(b):
