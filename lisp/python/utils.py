@@ -1,10 +1,10 @@
 #!/usr/bin/env python3.10
 """Utilities."""
 import hashlib
-import json
 import pathlib as p
 import typing as t
 
+import cson
 import regex as re
 
 
@@ -27,10 +27,10 @@ def cat(path: p.Path):
         return file.read()
 
 
-def json_from_path(path: p.Path):
+def cson_from_path(path: p.Path):
     """Load JSON from a path."""
     with open(path, "r", encoding="utf-8") as file:
-        return json.load(file)
+        return cson.load(file)
 
 
 def fullmatch(pattern, string, *args, **kwargs):
@@ -49,6 +49,7 @@ def composed_with(outer):
 
 
 def after(f, g):
+    """Compose two functions."""
     return lambda *args, **kwargs: f(g(*args, **kwargs))
 
 

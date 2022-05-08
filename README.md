@@ -4,7 +4,7 @@ A Lisp.
 
 ## Features
 
-- [ ] Union type support
+- [x] Union type support
 - [ ] Static type inference in Python
 - [ ] Optional typing of closures
 - [ ] Global error stack
@@ -17,8 +17,8 @@ A Lisp.
 ## Bugs
 
 - [ ] BUG: `join` can't be called on strings.
-- [ ] BUG. `assert` signature doesn't permit leaving out the ?-marked string.
-- [ ] BUG. same as above for `slice`
+- [x] BUG. `assert` signature doesn't permit leaving out the ?-marked string.
+- [x] BUG. same as above for `slice`
 
 ## Functions
 - [ ] ternary_then (`?> _ fn0 fn1`), calls one of two closures depending on first arguments truthiness

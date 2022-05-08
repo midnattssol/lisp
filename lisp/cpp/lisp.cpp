@@ -21,6 +21,7 @@
 #include "./command.h"
 #include "./num.h"
 #include "./scoping.h"
+#include "./vecex.h"
 
 bool DEBUG_MODE;
 std::mt19937 RNG;
@@ -50,7 +51,7 @@ void _lisp_assert_or_exit(bool condition, std::string message) {
 VariableScope<LispVar> VARIABLE_SCOPE = {{}, 0};
 
 std::string LispVar::to_str() {
-    unsigned int size;
+    uint size;
     std::stringstream ss;
 
     if (this->tag == BUILTIN) {
@@ -131,7 +132,7 @@ LispVar evaluate_const(std::string item);
 LispVar parse_expression(std::string expression);
 
 // ===| BUILTINS |===
-LispVar evaluate_expression(LispVar *expression, unsigned int index);
+LispVar evaluate_expression(LispVar *expression, uint index);
 
 /* Parse a Lisp expression into a tree. */
 LispVar parse_expression(std::string expression) {
@@ -150,8 +151,8 @@ LispVar parse_expression(std::string expression) {
     const std::string decr_depth = "}])";
     const auto npos = std::string::npos;
 
-    unsigned int tree_length = 1;
-    unsigned int depth = 0;
+    uint tree_length = 1;
+    uint depth = 0;
     int depth_buffer;
     int d_depth;  // Depth difference
 
@@ -260,6 +261,20 @@ LispVar parse_expression(std::string expression) {
     return output;
 }
 
+/* Check if a LispVar's type at runtime is less broad than or equal to a type.
+ */
+bool _type_leq(std::string *string, LispVar *lesser) {
+    if (!string->compare("any")) { return true; }
+    if (!string->compare("callable")) { return lesser->is_callable(); }
+    if (!string->compare("booly")) { return lesser->is_booly(); }
+    if (!string->compare("truthy")) { return lesser->truthiness(); }
+    if (!string->compare("falsy")) { return !lesser->truthiness(); }
+    if (!string->compare("iterable")) { return lesser->is_sized(); }
+    if (!string->compare("numeric")) { return lesser->is_numeric(); }
+    return *string == TYPENAMES.at(lesser->tag);
+}
+
+// warning this leaks
 /* Matches a vector of LispVars against a LispVar LIST containing TYPEs.
 
 Allowed sub-sub-values of `expected`
@@ -276,144 +291,61 @@ readability.
 
 */
 bool _types_match(std::vector<LispVar> args, LispVar expected) {
-    if (expected.tag != LIST) {
-        auto temp_str = "[['type' '*'] '*']";
-        _throw_could_not_cast({TYPE, *temp_str}, expected);
+    auto str_l = "list";
+    auto str_t = "type";
+
+    // Type check the type input.
+    if (expected.tag != LIST) _throw_could_not_cast({TYPE, *str_l}, expected);
+    for (auto pattern : *expected.vector) {
+        if (pattern.tag != LIST) _throw_could_not_cast({TYPE, *str_l}, pattern);
+        for (auto type : (*pattern.vector)) {
+            if (type.tag != TYPE) _throw_could_not_cast({TYPE, *str_t}, type);
+        }
     }
 
-    LispVar pattern;
-    LispVar arg;
+    using Left = std::string;  // Comparison object.
+    using Right = LispVar;     // Target object.
 
-    bool increase_expected_pointer;
-    unsigned int expected_pointer = 0;
-    unsigned int num_matched_in_repeat = 0;
+    vecex::Token<Left> top_node = {vecex::JUST};
+    std::optional<std::pair<vecex::uint_inf, vecex::uint_inf>> repeats;
 
-    const auto expected_size = expected.vector->size();
-    const auto args_size = args.size();
+    // Parse the LispVars and construct a vecex tree.
+    for (auto child_0 : *expected.vector) {
+        auto inner_token = new vecex::Token<Left>;
+        *inner_token = {vecex::INTERSECTION, {}};
+        repeats = {};
 
-    auto expected_size_minus_stars = expected_size;
-
-    bool has_star = 0;
-    bool has_add = 0;
-    bool has_qmrk = 0;
-    bool matched = 0;
-    bool matched_has_been_set = 0;
-
-    for (size_t i = 0; i < args_size; i++) {
-        // Check if continuing will go past the size of the expected vector.
-        if (expected_pointer >= expected_size) { return false; }
-
-        pattern = (*expected.vector)[expected_pointer];
-        if (pattern.tag != LIST) {
-            auto temp_str = "[type *]";
-            _throw_could_not_cast({TYPE, *temp_str}, expected);
-        }
-
-        arg = args[i];
-        matched = true;
-        increase_expected_pointer = true;
-
-        for (auto type : (*pattern.vector)) {
-            if (type.tag != TYPE) {
-                auto temp_str = "type";
-                _throw_could_not_cast({TYPE, *temp_str}, type);
-            }
-
-            if (!type.string->compare("any")) {
-            } else if (!type.string->compare("callable")) {
-                matched &= arg.is_callable();
-            } else if (!type.string->compare("booly")) {
-                matched &= arg.is_booly();
-            } else if (!type.string->compare("truthy")) {
-                matched &= arg.truthiness();
-            } else if (!type.string->compare("falsy")) {
-                matched &= !arg.truthiness();
-            } else if (!type.string->compare("iterable")) {
-                matched &= arg.is_sized();
-            } else if (!type.string->compare("numeric")) {
-                matched &= arg.is_numeric();
-            } else if (!type.string->compare("*")) {
-                has_star = 1;
-                expected_size_minus_stars -= !num_matched_in_repeat;
-            } else if (!type.string->compare("+")) {
-                has_add = 1;
-                expected_size_minus_stars -= !num_matched_in_repeat;
-            } else if (!type.string->compare("?")) {
-                has_qmrk = 1;
-                expected_size_minus_stars -= !num_matched_in_repeat;
+        for (auto child_1 : *child_0.vector) {
+            // std::cout << *child_1.string << '\n';
+            if (!child_1.string->compare("*")) {
+                repeats = {{0, false}, {0, true}};
+            } else if (!child_1.string->compare("+")) {
+                repeats = {{0, false}, {0, true}};
+            } else if (!child_1.string->compare("?")) {
+                repeats = {{0, false}, {1, false}};
             } else {
-                // Iterate over all allowed types.
-                for (size_t i = 0; i < TYPENAMES.size(); i++) {
-                    if (!type.string->compare(TYPENAMES.at(i))) {
-                        matched &= arg.tag == i;
-                        matched_has_been_set = true;
-                        break;
-                    }
-                }
-
-                if (!matched_has_been_set) {
-                    // The type is malformed, so an error is thrown.
-                    std::cout << "Could not typecheck with malformed type "
-                              << type.to_repr() << ".\n";
-                    exit(1);
-                }
+                inner_token->tokens.push_back(*child_1.string);
             }
         }
 
-        if (has_add || has_star || has_qmrk) {
-            // Increases or sets the counter to 0.
-            num_matched_in_repeat += matched;
-            num_matched_in_repeat *= matched;
-            // Removes the star and add for the next matching attempt.
-            has_star &= matched;
-            has_add &= matched;
-            has_qmrk &= matched;
-            // Increase the pointer only if it didn't match.
-            increase_expected_pointer = !matched;
-
-            if (has_add && !matched && !num_matched_in_repeat) {
-                // The match failed due to getting 0 matches on a +
-                // argument.
-                return false;
-            }
-
-            if (has_qmrk && (num_matched_in_repeat > 1)) {
-                // The match failed due to getting > 1 matches on a ?
-                // argument.
-                continue;
-                // return false;
-            }
-
-        } else if (!matched) {
-            // The match failed by not matching the type exactly and not
-            // having a repeat flag set.
-            return false;
-        }
-
-        expected_pointer += increase_expected_pointer;
-    }
-
-    // Iterate through the remaining arguments to find the stars.
-    // This is done to avoid bugs where lower-arity calls don't match
-    // higher-arity conditional calls.
-    bool _flag;
-    for (size_t i = expected_pointer + 1; i < expected_size; i++) {
-        pattern = (*expected.vector)[expected_pointer];
-        if (pattern.tag != LIST) {
-            auto temp_str = "[type *]";
-            _throw_could_not_cast({TYPE, *temp_str}, expected);
-        }
-
-        for (auto type : (*pattern.vector)) {
-            _flag = (!type.string->compare("*") || !type.string->compare("+") ||
-                     !type.string->compare("?"));
-            expected_size_minus_stars -= _flag;
-            if (_flag) { continue; }
+        // Wrap the token inside another one if it has been repeated.
+        if (repeats.has_value()) {
+            auto nums = repeats.value();
+            auto wrapper_token = new vecex::Token<Left>;
+            *wrapper_token = {vecex::BETWEEN, {inner_token}};
+            wrapper_token->min = nums.first;
+            wrapper_token->max = nums.second;
+            top_node.tokens.push_back(wrapper_token);
+        } else {
+            top_node.tokens.push_back(inner_token);
         }
     }
 
-    return (expected_pointer >= expected_size_minus_stars &&
-            expected_pointer <= expected_size);
+    vecex::Comparer<Left, Right> matches = [&](Left a, Right b) {
+        return _type_leq(&a, &b);
+    };
+    auto match = vecex::fullmatch(&top_node, &args, &matches);
+    return match.has_value();
 }
 
 LispVar call_variable(LispVar variable, std::vector<LispVar> args) {
@@ -441,7 +373,7 @@ LispVar call_closure(LispVar closure, std::vector<LispVar> arguments) {
     // Then it should call (let argname arg) to bind the arguments
     // to the function values.
     auto argument_names = closure.tree->subtree(1);
-    unsigned int arity = argument_names.size() - 1;
+    uint arity = argument_names.size() - 1;
 
     assert(arity == arguments.size());
 
@@ -589,11 +521,11 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args, bool safe) {
 
     // Assertions.
     if (!op.compare("assert")) {
-        auto temp_string = "bool";
-        bool success =
-            call_builtin(LispVar{BUILTIN, *temp_string}, {args[0]}).num;
+        bool success = args[0].truthiness();
         _lisp_assert_or_exit(
-            success, ((arity == 2) ? *args[1].string : "AssertionError"));
+            success,
+            "Assertion" + ((arity == 2) ? " `" + *args[1].string + "`" : "") +
+                " failed (evaluated " + args[0].to_str() + ").");
         return *_SINGLETON_NOTHING;
     }
 
@@ -685,7 +617,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args, bool safe) {
 
         if (arity > 1) {
             // Checks that the sizes of the lists are all equal.
-            auto _size = new unsigned int;
+            auto _size = new uint;
             *_size = args[1].size();
             for (size_t i = 2; i < arity; i++) {
                 _lisp_assert_or_exit(
@@ -783,12 +715,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args, bool safe) {
     }
     // Flow control
     if (!op.compare("ternary")) {
-        LispVar boolcaller;
-        std::string temp_str = "bool";
-        boolcaller.tag = BUILTIN;
-        boolcaller.string = &temp_str;
-        bool result = call_builtin(boolcaller, {args[0]}).num;
-        return result ? args[1] : args[2];
+        return args[0].truthiness() ? args[1] : args[2];
     }
 
     // Numeric functions
@@ -967,7 +894,7 @@ These are computed recursively by evaluating the leaves (constants).
 Note that the variable resolution takes place when they are called as leaf nodes
 in this context.
 */
-LispVar evaluate_expression(LispVar *expression, unsigned int index) {
+LispVar evaluate_expression(LispVar *expression, uint index) {
     auto item = expression->tree->nodes[index];
 
     // Resolves variables.

@@ -1,16 +1,17 @@
 #!/usr/bin/env python3.10
 """Generate some code."""
-import cson
-import more_itertools as mit
 import pathlib as p
 
+import cson
 
 BASEPATH = p.Path(__file__).parent
 
 
 def get_code():
     """Get the code."""
-    with open(BASEPATH / "builtins.cson", "r", encoding="utf-8") as file:
+    with open(
+        BASEPATH.parent / "data" / "builtins.cson", "r", encoding="utf-8"
+    ) as file:
         content = file.read()
 
     signatures = cson.loads(content)
@@ -54,7 +55,7 @@ def get_code():
 
 def main():
     """Write the code."""
-    with open(BASEPATH / "gen.h", "w", encoding="utf-8") as file:
+    with open(BASEPATH.parent / "cpp" / "gen.h", "w", encoding="utf-8") as file:
         file.write(get_code())
 
 

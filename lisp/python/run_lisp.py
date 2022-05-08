@@ -1,17 +1,24 @@
 #!/usr/bin/env python3.10
 """Runs the lisp."""
 import argparse
+import functools as ft
 import hashlib
 import pathlib as p
 import subprocess
 import sys
 import typing as t
-import functools as ft
 
-from preprocessor import make_canon
 import utils
+from preprocessor import make_canon
 
 BASEPATH = p.Path(__file__).parent
+GCPP_FLAGS = ["-O1", "-fconcepts-ts"]
+
+
+def _run(*args, **kwargs):
+    result = subprocess.run(*args, **kwargs)
+    if result.returncode:
+        exit(result.returncode)
 
 
 def _recompile_if_necessary(args):
@@ -19,24 +26,29 @@ def _recompile_if_necessary(args):
         return
 
     # Regenerate programmatical headers.
-    subprocess.run(["python", str(BASEPATH / "generative.py")])
+    _run(["python", str(BASEPATH / "generate_code.py")])
 
     # Get hashes of files.
-    origin = BASEPATH / "lisp.cpp"
-    files2hash = [origin, *(i for i in BASEPATH.iterdir() if i.suffix == ".h")]
+    origin = BASEPATH.parent / "cpp" / "lisp.cpp"
+    files2hash = [
+        origin,
+        *(i for i in (BASEPATH.parent / "cpp").iterdir() if i.suffix == ".h"),
+    ]
     digest = ft.reduce(
         lambda a, b: a ^ b, (int(utils.hash_file(f), base=16) for f in files2hash)
     )
     digest = hex(digest).removeprefix("0x")
-    files_changed = digest != utils.cat(BASEPATH / ".source.hash")
+    hash_path = BASEPATH.parent / "cpp" / ".source.hash"
+    files_changed = digest != utils.cat(hash_path)
 
     # Perform the recompilation.
     if args.recompile == "always" or files_changed:
         if args.debug:
             print("[DEBUG] The executable has changed and needs to be recompiled.")
 
-        subprocess.run(["g++", "-O1", "-o", str(BASEPATH / "lisp"), origin])
-        with open(BASEPATH / ".source.hash", "w", encoding="utf-8") as file:
+        _run(["g++", *GCPP_FLAGS, "-o", str(BASEPATH.parent / "lisp"), origin])
+
+        with open(hash_path, "w", encoding="utf-8") as file:
             file.write(digest)
 
 
@@ -92,7 +104,7 @@ def main(argv: t.List[str]) -> None:
         file.write(canon)
 
     _recompile_if_necessary(args)
-    subprocess.run([str(BASEPATH / "lisp"), str(temp_path), str(int(args.debug))])
+    _run([str(BASEPATH.parent / "lisp"), str(temp_path), str(int(args.debug))])
 
 
 if __name__ == "__main__":

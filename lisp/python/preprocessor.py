@@ -19,8 +19,8 @@ import utils
 BASEPATH = p.Path(__file__).parent
 SIGNED_LONG_RANGE = range(-2_147_483_648, 2_147_483_648)
 
-SHORTHANDS = utils.json_from_path(BASEPATH / "shorthands.json")
-MODIFY_IN_PLACE = utils.json_from_path(BASEPATH / "prefix_equals.json")
+SHORTHANDS = utils.cson_from_path(BASEPATH.parent / "data" / "shorthands.cson")
+MODIFY_IN_PLACE = utils.cson_from_path(BASEPATH.parent / "data" / "prefix_equals.cson")
 
 _BASE_N_NUM_REGEX = "({prefix}([{nums}]+_)*[{nums}]+)"
 _BASE10_NUM = _BASE_N_NUM_REGEX.format(prefix="", nums=r"\d")
