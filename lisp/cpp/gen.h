@@ -146,6 +146,9 @@ BUILTINS_TYPES["do"] = type_44;
 auto type_45 = new LispVar;
 *type_45 = parse_and_evaluate("[(map type [\"expression\"]) (map type [\"expression\"])]");
 BUILTINS_TYPES["while"] = type_45;
+auto type_46 = new LispVar;
+*type_46 = parse_and_evaluate("[(map type [\"int\"])]");
+BUILTINS_TYPES["exit"] = type_46;
 BUILTINS_TYPES_READY = true;
 }
 const std::set<std::string> LISP_BUILTINS = {"do",
@@ -172,6 +175,7 @@ const std::set<std::string> LISP_BUILTINS = {"do",
 "bool",
 "call",
 "eval",
+"exit",
 "flip",
 "fold",
 "help",

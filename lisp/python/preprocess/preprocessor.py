@@ -13,14 +13,16 @@ import typing as t
 
 import regex as re
 import utils
-from .macro import Macro, Arity, BadMacroArity
-from .numbers import SIGNED_LONG_RANGE, NUMBER_REGEX, get_numeric_or_none
+
+from .macro import Arity, BadMacroArity, Macro
+from .numbers import NUMBER_REGEX, SIGNED_LONG_RANGE, get_numeric_or_none
 
 # ===| Globals |===
 
 BASEPATH = p.Path(__file__).parent.parent
 SHORTHANDS = utils.cson_from_path(BASEPATH.parent / "data" / "shorthands.cson")
 MODIFY_IN_PLACE = utils.cson_from_path(BASEPATH.parent / "data" / "prefix_equals.cson")
+BOOLS = {"Yes": "True", "No": "False", "On": "True", "Off": "False"}
 
 
 def _get_macros():
@@ -193,6 +195,9 @@ def make_canon(expr: str) -> str:
     numeric = get_numeric_or_none(expr)
     if numeric is not None:
         return numeric
+
+    if expr in BOOLS:
+        return BOOLS[expr]
 
     return expr
 

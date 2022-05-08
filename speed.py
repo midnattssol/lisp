@@ -47,7 +47,7 @@ def main():
 
     lisp_result = timeit.timeit(
         lambda: subprocess.run(
-            ["python", "lisp/python/run_lisp.py", "examples/example_sort.lisp"],
+            ["python", "lisp/python/run_lisp.py", "examples/sort.lisp"],
             stdout=DEV_NULL,
         ),
         number=args.num,

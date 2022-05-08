@@ -447,6 +447,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
     // No operation.
     if (!op.compare("noop")) { return *_SINGLETON_NOTHING; }
     if (!op.compare("do")) { return args[arity - 1]; }
+    if (!op.compare("exit")) { exit(args[0].num); }
     if (!op.compare("while")) {
         while (evaluate_expression(&args[0]).truthiness()) {
             evaluate_expression(&args[1]);
