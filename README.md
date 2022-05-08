@@ -21,12 +21,12 @@ A Lisp.
 - [x] BUG. same as above for `slice`
 
 ## Functions
-- [ ] ternary_then (`?> _ fn0 fn1`), calls one of two closures depending on first arguments truthiness
-- [ ] none_coalesce (`??`)
-    - [ ] `??=`
-- [ ] none-coalescing function shorthand with [op]? (f. ex. `@?`)
-- [ ] fold based on first value if no default given
+- [x] ternary_then (`?> _ fn0 fn1`), calls one of two closures depending on first arguments truthiness
+- [x] none-coalescing function shorthand with [op]? (f. ex. `@?`)
+- [x] fold based on first value if no default given
 - [x] Random function
     - [ ] Seed function
 - [ ] hash function
 - [ ] Broadcasting function
+- [x] ++
+- [x] --

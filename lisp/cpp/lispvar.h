@@ -184,7 +184,7 @@ auto _SINGLETON_NOT_SET = new LispVar;
 auto _SINGLETON_NOARGS_TOKEN = new LispVar;
 
 const std::map<unsigned int, const std::string> TYPENAMES{
-    {NUM, "num"},
+    {NUM, "int"},
     {STRING, "string"},
     {FLOAT, "float"},
     {LIST, "list"},

@@ -1,11 +1,23 @@
 #!/usr/bin/env python3.10
 """Utilities."""
 import hashlib
+import secrets
 import pathlib as p
 import typing as t
 
 import cson
 import regex as re
+
+
+def temp_path():
+    """Get a temporary path."""
+    base = p.Path("/tmp/")
+
+    while True:
+        path = base / secrets.token_hex(8)
+        if path.exists():
+            continue
+        return path
 
 
 def hash_file(path: p.Path):
@@ -56,3 +68,14 @@ def after(f, g):
 def bool2sign(b):
     """Get a sign from a bool-like."""
     return 1 if b else -1
+
+
+def counted(f):
+    """Count how many times the decorated function is called."""
+
+    def wrapped(*args, **kwargs):
+        wrapped.calls += 1
+        return f(*args, **kwargs)
+
+    wrapped.calls = 0
+    return wrapped

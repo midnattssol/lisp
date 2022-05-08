@@ -13,37 +13,66 @@ import typing as t
 
 import regex as re
 import utils
+from .macro import Macro, Arity, BadMacroArity
+from .numbers import SIGNED_LONG_RANGE, NUMBER_REGEX, get_numeric_or_none
 
 # ===| Globals |===
 
-BASEPATH = p.Path(__file__).parent
-SIGNED_LONG_RANGE = range(-2_147_483_648, 2_147_483_648)
-
+BASEPATH = p.Path(__file__).parent.parent
 SHORTHANDS = utils.cson_from_path(BASEPATH.parent / "data" / "shorthands.cson")
 MODIFY_IN_PLACE = utils.cson_from_path(BASEPATH.parent / "data" / "prefix_equals.cson")
 
-_BASE_N_NUM_REGEX = "({prefix}([{nums}]+_)*[{nums}]+)"
-_BASE10_NUM = _BASE_N_NUM_REGEX.format(prefix="", nums=r"\d")
 
-BASES = {"0b": 2, "0t": 3, "0x": 16}
-NUMBER_REGEX = re.compile(
-    r"[-+]?("
-    + "|".join(
-        _BASE_N_NUM_REGEX.format(
-            prefix=prefix,
-            nums=string.digits[:base] + string.ascii_lowercase[: max(base - 10, 0)],
-        )
-        for prefix, base in BASES.items()
+def _get_macros():
+    def _dfn(args):
+        if len(args) == 1:
+            args.insert(0, "{_}")
+        assert len(args) == 2
+        res = f"closure (expression {args[0]} {args[1]})"
+        return res
+
+    macros = [
+        Macro(
+            ["??", "call_ncol!"],
+            "eval_expr (? {args[0]} (expression {args[1]}) (expression Nothing))",
+            arity=2,
+        ),
+        Macro(
+            "if!",
+            "eval_expr (? {args[0]} (expression {args[1]}) (expression {args[2]}))",
+            arity=3,
+        ),
+        Macro(
+            ["=>", "def!"],
+            arity=Arity(2, 3),
+            func=lambda args: f"let {args[0]} ({_dfn(args[1:])})",
+        ),
+        Macro(
+            "while!", arity=2, fmt="while (expression {args[0]}) (expression {args[1]})"
+        ),
+        Macro(["++"], arity=1, fmt="let {args[0]} (+ {args[0]} 1)"),
+        Macro(["--"], arity=1, fmt="let {args[0]} (- {args[0]} 1)"),
+        Macro(["λ", "lambda!"], Arity(1, 2), func=_dfn),
+    ]
+
+    # Add the in-place operators as macros.
+    func0 = (
+        lambda op: lambda args: f"let {args[0]} ({op} {' '.join(args[1:])} {args[0]})"
     )
-    + "|"
-    + _BASE10_NUM
-    + r"|"
-    # Exponents
-    + "(" + _BASE10_NUM + "e" + _BASE10_NUM + ")" + ")",
-    re.VERBOSE | re.IGNORECASE,
-)
+    func1 = (
+        lambda op: lambda args: f"let {args[0]} ({op} {args[0]} {' '.join(args[1:])})"
+    )
 
-FLOAT_REGEX = re.compile("(" + _BASE10_NUM[1:-1] + r"\.(\d*)" + r")|(\.\d+)")
+    for name, items in MODIFY_IN_PLACE.items():
+        if MODIFY_IN_PLACE[name].get("rev"):
+            macros.append(Macro(name, func=func0(items["op"]), arity=Arity.min(1)))
+        else:
+            macros.append(Macro(name, func=func1(items["op"]), arity=Arity.min(1)))
+
+    return macros
+
+
+MACROS = _get_macros()
 
 # ===| Functions |===
 
@@ -54,6 +83,7 @@ def tokens_of(expr: str) -> t.List[str]:
     in_string_literal = False
     depth = 0
     line_is_comment = False
+    last_was_escape = False
 
     for i, char in enumerate(expr):
         line_is_comment |= char == ";" and not in_string_literal
@@ -64,12 +94,20 @@ def tokens_of(expr: str) -> t.List[str]:
 
         d_depth = (char in "([{") - (char in "}])")
         depth += d_depth
-        in_string_literal ^= char == "'"
+        if in_string_literal:
+            in_string_literal &= char != '"' or last_was_escape
+        else:
+            in_string_literal |= not in_string_literal and char == '"'
 
         if not (in_string_literal or depth) and re.match(r"\s", char):
             if tokens[-1]:
                 tokens.append("")
             continue
+
+        if last_was_escape and char == "\\":
+            last_was_escape = False
+        else:
+            last_was_escape = char == "\\"
 
         tokens[-1] += char
 
@@ -104,75 +142,26 @@ def _make_range_canon(expr: str) -> str:
 
 
 def _make_function_canon(expr: str) -> str:
-    """Recursively canonize child tokens.
-
-    Also performs expansions of lambda shorthands and in-place operators.
-    """
+    """Recursively canonize child tokens and expand macros."""
     expr = expr[1:-1]
     canon_tokens = list(map(make_canon, tokens_of(expr)))
 
-    if canon_tokens[0] in MODIFY_IN_PLACE:
-        if MODIFY_IN_PLACE[canon_tokens[0]].get("rev"):
-            canon_tokens = [
-                "let",
-                canon_tokens[1],
-                f"({MODIFY_IN_PLACE[canon_tokens[0]]['op']} "
-                + " ".join(canon_tokens[2:])
-                + " "
-                + canon_tokens[1]
-                + ")",
-            ]
-        else:
-            canon_tokens = [
-                "let",
-                canon_tokens[1],
-                f"({MODIFY_IN_PLACE[canon_tokens[0]]['op']} {canon_tokens[1]} "
-                + " ".join(canon_tokens[2:])
-                + ")",
-            ]
+    for macro in MACROS:
+        if canon_tokens[0] in macro.names:
+            try:
+                result = macro.format_or_throw(canon_tokens)
+            except BadMacroArity as a:
+                print(repr(a))
+                exit(1)
 
-        canon_tokens = list(map(make_canon, canon_tokens))
-
-    if canon_tokens[0] in {"=>", "λ"}:
-        # No arguments have been provided. Fall back on _.
-        if len(canon_tokens) == 3:
-            canon_tokens.insert(2, "{_}")
-
-        canon_tokens = [
-            "let",
-            canon_tokens[1],
-            "(closure {" + " ".join(canon_tokens[2:]) + "})",
-        ]
-        canon_tokens = list(map(make_canon, canon_tokens))
+            result = f"({result})"
+            canon_tokens = tokens_of(make_canon(result)[1:-1])
+            break
 
     return "(" + " ".join(canon_tokens) + ")"
 
 
-def _get_numeric_or_none(expr: str) -> t.Optional[t.Union[int, float]]:
-    """Get a numeric value if the expression is numeric. Otherwise, return None."""
-    if utils.fullmatch(FLOAT_REGEX, expr):
-        return float(expr)
-
-    # Canonicalizes numbers of other bases.
-    for base_str, base in BASES.items():
-        if match := re.match(r"-?" + base_str, expr):
-            match_length = len(match.group())
-            if match_length >= 2:
-                result = int(expr[match_length:], base)
-                result *= utils.bool2sign(expr[0] != "-")
-                return result
-
-    # Canonicalizes numbers in scientific notation.
-    if utils.fullmatch(r"[+-]?\d+e[+-]?\d+", expr, re.IGNORECASE):
-        num, exp = map(int, re.split(r"[eE]", expr))
-        return num * 10**exp
-
-    if utils.fullmatch(NUMBER_REGEX, expr):
-        return int(expr)
-
-    return None
-
-
+@utils.counted
 @utils.composed_with(postparse)
 def make_canon(expr: str) -> str:
     """Make an expression canon."""
@@ -181,22 +170,17 @@ def make_canon(expr: str) -> str:
     if expr in SHORTHANDS:
         return SHORTHANDS[expr]
 
-    if expr.startswith(";"):
-        expr = "\n".join(expr.splitlines()[1:])
-        return make_canon(expr)
-
     if len(expr) >= 2:
         # Canonicalizes shorthand brackets.
         if expr[0] == "{" and expr[-1] == "}":
             expr = "(expression " + expr[1:-1] + ")"
-            return make_canon(expr)
-
         if expr[0] == "[" and expr[-1] == "]":
             expr = "(list " + expr[1:-1] + ")"
-            return make_canon(expr)
-
         if expr[0] == "(" and expr[-1] == ")":
-            return _make_function_canon(expr)
+            expr = _make_function_canon(expr)
+            if expr.startswith("((") and expr.endswith("))"):
+                expr = f"(call {expr[1:-1]})"
+            return expr
 
     # Canonicalizes ranges.
     if 1 <= expr.count(":") <= 3:
@@ -206,7 +190,7 @@ def make_canon(expr: str) -> str:
         ):
             return _make_range_canon(expr)
 
-    numeric = _get_numeric_or_none(expr)
+    numeric = get_numeric_or_none(expr)
     if numeric is not None:
         return numeric
 

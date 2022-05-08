@@ -24,6 +24,7 @@
 #include "./vecex.h"
 
 bool DEBUG_MODE;
+bool SAFE_MODE;
 std::mt19937 RNG;
 
 /* Assert that a condition is truthy, or print an error message and exit. */
@@ -124,15 +125,13 @@ std::string LispVar::get_help_str() {
     return ss.str();
 }
 
-LispVar call_builtin(LispVar operation,
-                     std::vector<LispVar> args,
-                     bool safe = true);
+LispVar call_builtin(LispVar operation, std::vector<LispVar> args);
 LispVar call_closure(LispVar operation, std::vector<LispVar> args);
 LispVar evaluate_const(std::string item);
 LispVar parse_expression(std::string expression);
 
 // ===| BUILTINS |===
-LispVar evaluate_expression(LispVar *expression, uint index);
+LispVar evaluate_expression(LispVar *expression, uint index = 1);
 
 /* Parse a Lisp expression into a tree. */
 LispVar parse_expression(std::string expression) {
@@ -158,7 +157,7 @@ LispVar parse_expression(std::string expression) {
 
     bool last_is_empty;
     bool in_string_literal = false;
-    bool last_was_backslash = false;
+    bool escape_next = false;
     bool last_was_paren = false;
     bool last_was_paren_buffer = false;  // One token behind.
     bool line_is_comment = false;
@@ -175,6 +174,13 @@ LispVar parse_expression(std::string expression) {
                   (decr_depth.find(character) != npos);
         last_was_paren = last_was_paren || (d_depth > 0);
         depth += d_depth;
+
+        // Keeps track of whether or not the parser is inside a string
+        // literal to avoid splitting at bad times.
+        if (in_string_literal)
+            in_string_literal &= character != '"' || escape_next;
+        else
+            in_string_literal |= !in_string_literal && character == '"';
 
         last_was_paren_buffer = last_was_paren || last_was_paren_buffer;
 
@@ -222,10 +228,7 @@ LispVar parse_expression(std::string expression) {
             continue;
         }
 
-        // Keeps track of whether or not the parser is inside a string
-        // literal to avoid splitting at bad times.
-        in_string_literal ^= character == '"' && !last_was_backslash;
-        last_was_backslash = character == '\\';
+        escape_next = !escape_next && (character == '\\');
 
         if (last_is_empty) depth_buffer = depth + !last_was_paren;
 
@@ -291,15 +294,22 @@ readability.
 
 */
 bool _types_match(std::vector<LispVar> args, LispVar expected) {
-    auto str_l = "list";
-    auto str_t = "type";
+    std::string str_l = "list";
+    std::string str_t = "type";
+    LispVar l;
+    l.tag = TYPE;
+    l.string = &str_l;
+
+    LispVar t;
+    t.tag = TYPE;
+    t.string = &str_t;
 
     // Type check the type input.
-    if (expected.tag != LIST) _throw_could_not_cast({TYPE, *str_l}, expected);
+    if (expected.tag != LIST) _throw_could_not_cast(l, expected);
     for (auto pattern : *expected.vector) {
-        if (pattern.tag != LIST) _throw_could_not_cast({TYPE, *str_l}, pattern);
+        if (pattern.tag != LIST) _throw_could_not_cast(l, pattern);
         for (auto type : (*pattern.vector)) {
-            if (type.tag != TYPE) _throw_could_not_cast({TYPE, *str_t}, type);
+            if (type.tag != TYPE) _throw_could_not_cast(t, type);
         }
     }
 
@@ -320,7 +330,7 @@ bool _types_match(std::vector<LispVar> args, LispVar expected) {
             if (!child_1.string->compare("*")) {
                 repeats = {{0, false}, {0, true}};
             } else if (!child_1.string->compare("+")) {
-                repeats = {{0, false}, {0, true}};
+                repeats = {{1, false}, {0, true}};
             } else if (!child_1.string->compare("?")) {
                 repeats = {{0, false}, {1, false}};
             } else {
@@ -349,11 +359,8 @@ bool _types_match(std::vector<LispVar> args, LispVar expected) {
 }
 
 LispVar call_variable(LispVar variable, std::vector<LispVar> args) {
-    if (variable.tag == BUILTIN) {
-        return call_builtin(variable, args);
-    } else if (variable.tag == CLOSURE) {
-        return call_closure(variable, args);
-    }
+    if (variable.tag == BUILTIN) { return call_builtin(variable, args); }
+    if (variable.tag == CLOSURE) { return call_closure(variable, args); }
 
     assert(false);
 }
@@ -406,7 +413,7 @@ LispVar call_closure(LispVar closure, std::vector<LispVar> arguments) {
 }
 
 /* Perform an operation on the inputs. */
-LispVar call_builtin(LispVar operation, std::vector<LispVar> args, bool safe) {
+LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
     assert(operation.tag == BUILTIN);
 
     LispVar output;
@@ -422,7 +429,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args, bool safe) {
     if (arity == 1 && args[0] == *_SINGLETON_NOARGS_TOKEN) args = {};
 
     // Typecheck the arguments.
-    if (BUILTINS_TYPES_READY && safe) {
+    if (BUILTINS_TYPES_READY && SAFE_MODE) {
         if (!BUILTINS_TYPES.count(op)) {
             std::cout << "[bug] Operation '" << op
                       << "' is not typed. Exiting.\n";
@@ -440,6 +447,12 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args, bool safe) {
     // No operation.
     if (!op.compare("noop")) { return *_SINGLETON_NOTHING; }
     if (!op.compare("do")) { return args[arity - 1]; }
+    if (!op.compare("while")) {
+        while (evaluate_expression(&args[0]).truthiness()) {
+            evaluate_expression(&args[1]);
+        }
+        return *_SINGLETON_NOTHING;
+    }
 
     // Generate a list of random numbers.
     if (!op.compare("rand")) {
@@ -643,10 +656,26 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args, bool safe) {
     }
 
     if (!op.compare("fold")) {
-        auto accumulator = args[1];
-        for (auto arg : *args[2].vector) {
-            accumulator = call_variable(args[0], {accumulator, arg});
+        LispVar accumulator;
+        uint vec_size = args[1].vector->size();
+        uint i = 0;
+
+        if (arity == 3) {
+            accumulator = args[2];
+        } else {
+            _lisp_assert_or_exit(vec_size,
+                                 "FoldError: An empty list cannot be folded "
+                                 "without an accumulator.\n");
+            exit(1);
+            accumulator = (*args[1].vector)[0];
+            i = 1;
         }
+
+        for (; i < vec_size; i++) {
+            auto item = (*args[1].vector)[i];
+            accumulator = call_variable(args[0], {accumulator, item});
+        }
+
         return accumulator;
     }
 
@@ -713,6 +742,9 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args, bool safe) {
             (*args[0].vector)[0],
             {(*args[0].vector).begin() + 1, (*args[0].vector).end()});
     }
+
+    if (!op.compare("eval_expr")) { return evaluate_expression(&args[0], 1); }
+
     // Flow control
     if (!op.compare("ternary")) {
         return args[0].truthiness() ? args[1] : args[2];
@@ -727,6 +759,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args, bool safe) {
         } else {
             output.tag = FLOAT;
             output.flt = accumulate_f(&args, 0, std::plus<float>());
+            return output;
         }
     }
     if (!op.compare("mul")) {
@@ -820,8 +853,8 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args, bool safe) {
         return output;
     }
     if (!op.compare("mod")) {
-        output.tag = FLOAT;
-        output.flt = std::fmod(NUMPART(args[0]), NUMPART(args[1]));
+        output.tag = NUM;
+        output.num = args[0].num % args[1].num;
         return output;
     }
 
@@ -951,9 +984,9 @@ void print_debug(std::string msg) {
 }
 
 int main(int argc, char const *argv[]) {
-    if (argc != 3) {
-        std::cout << "Error: Expected exactly 2 command-line arguments "
-                     "(filename and debug mode)."
+    if (argc != 4) {
+        std::cout << "Error: Expected exactly 3 command-line arguments "
+                     "(filename, debug mode, and safe mode)."
                   << '\n';
         exit(1);
     }
@@ -961,6 +994,7 @@ int main(int argc, char const *argv[]) {
     auto since_epoch = std::chrono::system_clock::now().time_since_epoch();
 
     DEBUG_MODE = std::stoi(argv[2]);
+    SAFE_MODE = std::stoi(argv[3]);
     RNG = std::mt19937(since_epoch.count());
 
     _fill_out_lisp_builtin_types();

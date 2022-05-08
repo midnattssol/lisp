@@ -9,7 +9,7 @@ import sys
 import typing as t
 
 import utils
-from preprocessor import make_canon
+from preprocess import make_canon
 
 BASEPATH = p.Path(__file__).parent
 GCPP_FLAGS = ["-O1", "-fconcepts-ts"]
@@ -59,9 +59,9 @@ def main(argv: t.List[str]) -> None:
         "origin",
         metavar="O",
         type=p.Path,
+        nargs="?",
         help="the lisp file to run",
     )
-
     parser.add_argument(
         "--debug",
         action="store_const",
@@ -77,14 +77,35 @@ def main(argv: t.List[str]) -> None:
         help="dump canonized output",
     )
     parser.add_argument(
+        "--unsafe",
+        action="store_const",
+        const=True,
+        default=False,
+        help="run unsafely",
+    )
+    parser.add_argument(
         "--recompile",
         choices=["never", "change", "always"],
         default="never",
         help="when to recompile the executable",
     )
+    parser.add_argument(
+        "-c",
+        "--code",
+        help="code to execute instead of running from a file",
+    )
+
     args = parser.parse_args()
-    with open(args.origin, "r", encoding="utf-8") as file:
-        file_contents = file.read()
+
+    if args.origin is None:
+        if args.code is None:
+            print("Error: Either the origin or --code options must be in use.")
+            exit(1)
+        file_contents = args.code
+
+    else:
+        with open(args.origin, "r", encoding="utf-8") as file:
+            file_contents = file.read()
 
     file_contents = f"(noop {file_contents})"
     canon = make_canon(file_contents)
@@ -104,7 +125,14 @@ def main(argv: t.List[str]) -> None:
         file.write(canon)
 
     _recompile_if_necessary(args)
-    _run([str(BASEPATH.parent / "lisp"), str(temp_path), str(int(args.debug))])
+    _run(
+        [
+            str(BASEPATH.parent / "lisp"),
+            str(temp_path),
+            str(int(args.debug)),
+            str(int(args.unsafe)),
+        ]
+    )
 
 
 if __name__ == "__main__":

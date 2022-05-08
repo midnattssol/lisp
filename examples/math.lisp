@@ -10,10 +10,6 @@
     )
 )
 
-; Do a fold based on the first value.
-; Placeholder function for now.
-(=> fold_not_empty {fn l} (fold fn (@ 0 l) (slice _ 1 (+ (# l) 1))))
-
 ; FUNCTIONS
 (=> factorial (starcall * (range 1 (+ _ 1))))
 (=> sgn (? _ (? (> _ 0) 1 -1) 0))
@@ -21,8 +17,8 @@
 (=> #/ (/ (starcall + _) (# _)))
 (=> max_2 {a b} (? (> a b) a b))
 (=> min_2 {a b} (? (< a b) a b))
-(=> max (fold_not_empty max_2 _))
-(=> min (fold_not_empty min_2 _))
+(=> max (fold max_2 _))
+(=> min (fold min_2 _))
 (=> abs (* _ (sgn _)))
 (=> ** {base exp} (starcall * (repeat exp base)))
 (=> >> {i offset} (/ i (** 2 offset)))

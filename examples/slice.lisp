@@ -17,7 +17,7 @@
 (slice numbers 10 20) ; -> [10 .. 19]
 
 ; Join lists.
-(join :3 :5 :3) ; -> [0, 1, 2, 0, 1, 2, 3, 4, 0, 1, 2]
+(, :3 :5 :3) ; -> [0, 1, 2, 0, 1, 2, 3, 4, 0, 1, 2]
 
 ; Get a list from a single element.
 (repeat 4 10) ; -> [10, 10, 10, 10]
