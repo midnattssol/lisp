@@ -2,6 +2,7 @@
 
 ; Short-circuit nothing.
 (=> ?? {_ default} (? (== _ Nothing) default _))
+(=> ?> {fn _} (if! (== _ Nothing) Nothing (fn _)))
 
 (=> is_type [a typename]
     (typematch [[(type typename)]] [a])

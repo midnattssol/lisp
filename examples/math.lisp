@@ -1,4 +1,5 @@
 (use! "math")
+(use! "io")
 
 (putl (<< 1 8)) ; -> 256
 (putl (starcall * [10 20 30])) ; -> 6000

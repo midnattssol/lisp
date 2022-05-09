@@ -50,7 +50,7 @@ class CodeGenerator:
 def get_builtins():
     """Get builtins."""
     gen = CodeGenerator(
-        ["<map>", "<string>"],
+        ["<map>", "<string>", "<set>"],
         "enum LispBuiltin {"
         + ",".join(map(_builtin2enum, SIGNATURES))
         + "};\n"
@@ -103,7 +103,7 @@ def get_code():
         code += f'BUILTINS_TYPES["{builtin}"] = type_{signatures.index(signature)};\n'
 
     code += "BUILTINS_TYPES_READY = true;\n}\n"
-    gen = CodeGenerator(["<set>", "<map>", '"./lispvar.h"'], code, "gen.h")
+    gen = CodeGenerator(["<map>", '"./lispvar.h"'], code, "gen.h")
     return gen
 
 

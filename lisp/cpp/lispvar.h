@@ -88,8 +88,7 @@ class LispVar {
     }
 
     bool is_numeric() {
-        return (this->tag == NUM || this->tag == NOTHING || this->tag == BOOL ||
-                this->tag == FLOAT);
+        return (this->tag == NUM || this->tag == BOOL || this->tag == FLOAT);
     }
 
     bool is_callable() {
@@ -103,7 +102,7 @@ class LispVar {
 
     bool is_booly() {
         return (this->tag == NUM || this->tag == NOTHING || this->tag == BOOL ||
-                this->tag == FLOAT || this->is_sized());
+                this->is_sized());
     }
 
     bool truthiness() {

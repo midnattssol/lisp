@@ -2,13 +2,6 @@
 
 ; (starcall * [10 20]) -> (* 10 20)
 (=> starcall {fn vec} (eval (insert fn 0 vec)))
-; Write on a new line.
-(=> putl
-    (noop
-        (put _)
-        (put "\n")
-    )
-)
 
 ; FUNCTIONS
 (=> factorial (starcall * (range 1 (+ _ 1))))
