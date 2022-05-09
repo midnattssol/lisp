@@ -4,11 +4,10 @@ A Lisp.
 
 ## Features
 
-- [x] Union type support
 - [ ] Static type inference in Python
 - [ ] Optional typing of closures
 - [ ] Global error stack
-- [ ] Imports
+- [x] Imports
     - [ ] Possibility to define own namespaces
     - [ ] Precompiling Lisp import functions
 - [ ] Returning closures from functions
@@ -19,6 +18,11 @@ A Lisp.
 - [ ] BUG: `join` can't be called on strings.
 - [x] BUG. `assert` signature doesn't permit leaving out the ?-marked string.
 - [x] BUG. same as above for `slice`
+
+## Speed
+
+- [x] Turn builtins into an enum instead of doing costly string comparison operators
+- [x] Union type support
 
 ## Functions
 - [x] ternary_then (`?> _ fn0 fn1`), calls one of two closures depending on first arguments truthiness

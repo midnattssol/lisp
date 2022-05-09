@@ -8,8 +8,8 @@ import subprocess
 import sys
 import typing as t
 
+import preprocess
 import utils
-from preprocess import make_canon
 
 BASEPATH = p.Path(__file__).parent
 GCPP_FLAGS = ["-O1", "-fconcepts-ts"]
@@ -96,6 +96,7 @@ def main(argv: t.List[str]) -> None:
     )
 
     args = parser.parse_args()
+    processor = preprocess.Preprocessor()
 
     if args.origin is None:
         if args.code is None:
@@ -107,8 +108,10 @@ def main(argv: t.List[str]) -> None:
         with open(args.origin, "r", encoding="utf-8") as file:
             file_contents = file.read()
 
+        processor.contexts[-1] = args.origin
+
     file_contents = f"(noop {file_contents})"
-    canon = make_canon(file_contents)
+    canon = processor.make_canon(file_contents)
 
     if args.dump:
         print(canon)

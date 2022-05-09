@@ -11,7 +11,7 @@
         (-- i)
     ))
 
-    (insert item ptr _list)
+    (insert item _list)
 ))
 
 

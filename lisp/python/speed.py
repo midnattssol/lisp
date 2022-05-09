@@ -4,6 +4,10 @@ import argparse
 import random
 import subprocess
 import timeit
+import pathlib as p
+
+
+BASEPATH = p.Path(__file__).parent
 
 
 def insert_sort(_list):
@@ -47,7 +51,11 @@ def main():
 
     lisp_result = timeit.timeit(
         lambda: subprocess.run(
-            ["python", "lisp/python/run_lisp.py", "examples/sort.lisp"],
+            [
+                "python",
+                str(BASEPATH / "run_lisp.py"),
+                str(BASEPATH / "../../examples/sort.lisp"),
+            ],
             stdout=DEV_NULL,
         ),
         number=args.num,

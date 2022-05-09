@@ -10,4 +10,7 @@ for i in tests/*.lisp; do
 done
 
 # Saves the performance statistics.
-python speed.py --num 10 > performance.txt
+python lisp/python/speed.py --num 100 > performance.txt
+
+# Saves the dependency tree for easy access.
+python lisp/python/includetree.py lisp/cpp/lisp.cpp > includetree.txt

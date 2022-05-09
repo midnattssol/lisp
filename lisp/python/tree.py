@@ -19,13 +19,19 @@ TrieNode = col.namedtuple("TrieNode", ["string", "terminal"])
 class Tree(t.Generic[T]):
     """A class implementing a tree structure."""
 
-    def __init__(self, /, nodes: t.Optional[t.List[T]] = None, depths: t.Optional[t.List[int]] = None):
+    def __init__(
+        self,
+        /,
+        nodes: t.Optional[t.List[T]] = None,
+        depths: t.Optional[t.List[int]] = None,
+    ):
         self.nodes = nodes if nodes is not None else list()
         self.depths = depths if depths is not None else list()
 
         if len(self.nodes) != len(self.depths):
             raise ValueError(
-                f"Nodes {self.nodes} and depths {self.depths} must be of the same length.")
+                f"Nodes {self.nodes} and depths {self.depths} must be of the same length."
+            )
 
     def __repr__(self):
         out = ""
@@ -60,9 +66,7 @@ class Tree(t.Generic[T]):
     def insert(self, index: int, child_node: T) -> None:
         """Add a child to the node with index `index`."""
         parent_depth = self.depths[index]
-        child_length = it.takewhile(parent_depth.__le__, self.depths[index + 1:])
-
-        number_of_children = mit.ilen(child_length)
+        number_of_children = mit.ilen(self.child_indices_of(index))
         new_pos = index + number_of_children + 1
 
         self.nodes.insert(new_pos, child_node)
@@ -73,8 +77,10 @@ class Tree(t.Generic[T]):
         if include_children:
             children = self.child_indices_of(index)
             number_of_items = 1 + mit.ilen(children)
-            output = [(self.nodes.pop(index), self.depths.pop(index))
-                      for _ in range(number_of_items)]
+            output = [
+                (self.nodes.pop(index), self.depths.pop(index))
+                for _ in range(number_of_items)
+            ]
             return output
 
         return self.nodes.pop(index), self.depths.pop(index)
@@ -83,13 +89,13 @@ class Tree(t.Generic[T]):
         """Returns direct child indices of the index."""
         return filter(
             lambda x: (self.depths[x] - 1) == self.depths[index],
-            self.child_indices_of(index)
+            self.child_indices_of(index),
         )
 
     def child_indices_of(self, index: int) -> t.Iterable[int]:
         """Get child indices of the node with index `index`."""
         parent_depth = self.depths[index]
-        children = it.takewhile(lambda x: x > parent_depth, self.depths[index + 1:])
+        children = it.takewhile(lambda x: x > parent_depth, self.depths[index + 1 :])
         return range(index + 1, index + mit.ilen(children) + 1)
 
     def children_of(self, index: int) -> t.Iterable[T]:
@@ -103,9 +109,13 @@ class Tree(t.Generic[T]):
         siblings_and_niblings = it.takewhile(lambda x: x >= depth, depths_up_to)
         distance_to_parent = mit.ilen(siblings_and_niblings) + 1
 
-        return index - distance_to_parent if (index - distance_to_parent) != -1 else None
+        return (
+            index - distance_to_parent if (index - distance_to_parent) != -1 else None
+        )
 
-    def index_of_grandparent_of_depth_of(self, depth: int, index: int) -> t.Optional[int]:
+    def index_of_grandparent_of_depth_of(
+        self, depth: int, index: int
+    ) -> t.Optional[int]:
         """Return the index of the first node in direct line of succession
         to the node of index `index` with depth `depth`."""
         parent_idx = index
@@ -142,6 +152,7 @@ class Trie(Tree[TrieNode]):
 
     See https://en.wikipedia.org/wiki/Trie for more information.
     """
+
     @classmethod
     def from_words(cls, words: t.List[str]):
         """Generate a trie from some words."""
@@ -170,7 +181,7 @@ class Trie(Tree[TrieNode]):
         val = ""
 
         for (item, depth) in self:
-            val = val[:depth - 1] + item.string
+            val = val[: depth - 1] + item.string
             if value == val:
                 return TrieMatch.INVALID if not item.terminal else TrieMatch.VALID
 
@@ -183,14 +194,14 @@ class Trie(Tree[TrieNode]):
         matches = [TrieMatch.INVALID]
         value_len = len(value)
         while matches[-1] != TrieMatch.NONE and value_len >= len(matches):
-            matches.append(self.matches(value[:len(matches)]))
+            matches.append(self.matches(value[: len(matches)]))
 
         valid_matches = [TrieMatch.VALID == i for i in matches]
 
         if not any(valid_matches):
             return default
         else:
-            return value[:max(i for i, match in enumerate(valid_matches) if match)]
+            return value[: max(i for i, match in enumerate(valid_matches) if match)]
 
     def _clean_direct_children(self, index: int = 0) -> None:
         """Recursively remove unneccessary nodes."""

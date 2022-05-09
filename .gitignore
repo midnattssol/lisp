@@ -3,4 +3,3 @@ unused
 lisp/lisp
 __pycache__
 *.gch
-performance.txt

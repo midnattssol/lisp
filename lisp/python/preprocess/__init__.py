@@ -1,1 +1,1 @@
-from .preprocessor import *
+from .preprocessor import Preprocessor

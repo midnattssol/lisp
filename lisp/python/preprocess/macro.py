@@ -73,4 +73,9 @@ class BadMacroArity(BaseException):
         """Get representation."""
         m = self.macro
         macro_name = " / ".join(map("`{}`".format, m.names))
-        return f"Macro {macro_name} expected {m.arity.start}-{m.arity.stop} arguments, but recieved {self.n}."
+        if (m.arity.start - m.arity.stop) < 1:
+            num = str(m.arity.start)
+        else:
+            num = f"{m.arity.start}-{m.arity.stop}"
+
+        return f"Macro {macro_name} expected {num} arguments, but recieved {self.n}."

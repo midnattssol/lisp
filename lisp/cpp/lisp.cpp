@@ -56,7 +56,7 @@ std::string LispVar::to_str() {
     std::stringstream ss;
 
     if (this->tag == BUILTIN) {
-        ss << "<Builtin '" << *(this->string) << "'>";
+        ss << "<Builtin '" << BUILTINS_NAMES.at(this->builtin) << "'>";
     } else if (this->tag == VARIABLE) {
         ss << "<Variable '" << *(this->string) << "'>";
     } else if (this->tag == TYPE) {
@@ -98,8 +98,8 @@ std::string LispVar::get_help_str() {
     std::stringstream ss;
 
     if (this->tag == BUILTIN) {
-        ss << "builtin '" << *(this->string) << "' "
-           << BUILTINS_TYPES[*this->string]->to_str();
+        ss << "builtin '" << BUILTINS_NAMES.at(this->builtin);
+        // << "' " << BUILTINS_TYPES[this->builtin]->to_str();
     } else if (this->tag == TYPE) {
         return "a type";
     } else if (this->tag == EXPRESSION) {
@@ -425,30 +425,31 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
         kind = args[i].tag == kind ? kind : __NOT_SET__;
     }
 
-    auto op = *operation.string;
+    auto op = operation.builtin;
+    auto name = BUILTINS_NAMES.at(op);
     if (arity == 1 && args[0] == *_SINGLETON_NOARGS_TOKEN) args = {};
 
     // Typecheck the arguments.
     if (BUILTINS_TYPES_READY && SAFE_MODE) {
-        if (!BUILTINS_TYPES.count(op)) {
+        if (!BUILTINS_TYPES.count(name)) {
             std::cout << "[bug] Operation '" << op
                       << "' is not typed. Exiting.\n";
             exit(1);
         }
-        auto arg_types_match = _types_match(args, *BUILTINS_TYPES.at(op));
+        auto arg_types_match = _types_match(args, *BUILTINS_TYPES.at(name));
         if (!arg_types_match) {
             LispVar actual_type;
             actual_type.tag = LIST;
             actual_type.vector = &args;
-            _throw_could_not_cast(*BUILTINS_TYPES.at(op), actual_type);
+            _throw_could_not_cast(*BUILTINS_TYPES.at(name), actual_type);
         }
     }
 
     // No operation.
-    if (!op.compare("noop")) { return *_SINGLETON_NOTHING; }
-    if (!op.compare("do")) { return args[arity - 1]; }
-    if (!op.compare("exit")) { exit(args[0].num); }
-    if (!op.compare("while")) {
+    if (op == B_NOOP) { return *_SINGLETON_NOTHING; }
+    if (op == B_DO) { return args[arity - 1]; }
+    if (op == B_EXIT) { exit(args[0].num); }
+    if (op == B_WHILE) {
         while (evaluate_expression(&args[0]).truthiness()) {
             evaluate_expression(&args[1]);
         }
@@ -456,7 +457,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
     }
 
     // Generate a list of random numbers.
-    if (!op.compare("rand")) {
+    if (op == B_RAND) {
         output.vector = new std::vector<LispVar>;
         for (int i = 0; i < args[0].num; i++) {
             // Using the mod here fixes the casting.
@@ -468,13 +469,13 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
     }
 
     // Bind a string to a variable value.
-    if (!op.compare("let")) {
+    if (op == B_LET) {
         VARIABLE_SCOPE.set_var(args[0].string, args[1]);
         return *_SINGLETON_NOTHING;
     }
 
     // Do regular expression matching.
-    if (!op.compare("match")) {
+    if (op == B_MATCH) {
         std::regex txt_regex;
         try {
             txt_regex = std::regex(*args[0].string);
@@ -490,38 +491,38 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
     }
 
     // ===| Base constructors |===
-    if (!op.compare("bool")) return {BOOL, args[0].truthiness()};
-    if (!op.compare("type")) {
+    if (op == B_BOOL) return {BOOL, args[0].truthiness()};
+    if (op == B_TYPE) {
         output.string = new std::string;
         *output.string = *args[0].string;
         output.tag = TYPE;
         return output;
     }
-    if (!op.compare("list")) {
+    if (op == B_LIST) {
         output.vector = new std::vector<LispVar>;
         *output.vector = args;
         output.tag = LIST;
         return output;
     }
-    if (!op.compare("symbol")) return args[0];
-    if (!op.compare("closure")) {
+    if (op == B_SYMBOL) return args[0];
+    if (op == B_CLOSURE) {
         output = args[0];
         output.tag = CLOSURE;
         return output;
     }
 
     // ===| Help functions |===
-    if (!op.compare("help")) {
+    if (op == B_HELP) {
         output.string = new std::string;
         *output.string = args[0].get_help_str();
         output.tag = STRING;
         return output;
     }
 
-    if (!op.compare("len")) return {NUM, args[0].size()};
+    if (op == B_LEN) return {NUM, args[0].size()};
 
     // Get the type of {0}.
-    if (!op.compare("typeof")) {
+    if (op == B_TYPEOF) {
         output.string = new std::string;
         *output.string = TYPENAMES.at(args[0].tag);
         output.tag = TYPE;
@@ -529,12 +530,12 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
     }
 
     // Matches the type {0} against the variables {1}.
-    if (!op.compare("typematch")) {
+    if (op == B_TYPEMATCH) {
         return {BOOL, _types_match(*args[1].vector, args[0])};
     }
 
     // Assertions.
-    if (!op.compare("assert")) {
+    if (op == B_ASSERT) {
         bool success = args[0].truthiness();
         _lisp_assert_or_exit(
             success,
@@ -544,13 +545,16 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
     }
 
     // Write a string to `cout`.
-    if (!op.compare("put")) {
-        std::cout << args[0].to_str();
+    if (op == B_PUT) {
+        for (size_t i = 0; i < arity; i++) {
+            std::cout << args[i].to_str();
+            if (i != (arity - 1)) std::cout << " ";
+        }
         return *_SINGLETON_NOTHING;
     }
 
     // Get the string representation of {0}.
-    if (!op.compare("repr")) {
+    if (op == B_REPR) {
         output.string = new std::string;
         output.tag = STRING;
 
@@ -561,7 +565,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
     }
 
     // Joins the contents of Q-Expressions.
-    if (!op.compare("join")) {
+    if (op == B_JOIN) {
         if (kind == LIST) {
             output.vector = new std::vector<LispVar>;
             output.tag = LIST;
@@ -577,8 +581,21 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
         }
     }
 
+    // Push {1} into {0}.
+    if (op == B_PUSH) {
+        args[0].vector->push_back(args[1]);
+        return *_SINGLETON_NOTHING;
+    }
+
+    // Pop the last element of {0} in place and return it.
+    if (op == B_POP) {
+        auto item = (*args[0].vector)[args[0].vector->size() - 1];
+        args[0].vector->pop_back();
+        return item;
+    }
+
     // Insert {0} at index {1} in {2}.
-    if (!op.compare("insert")) {
+    if (op == B_INSERT) {
         output.vector = new std::vector<LispVar>;
         output.tag = LIST;
 
@@ -601,7 +618,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
     }
 
     // Repeat {1} {0} times.
-    if (!op.compare("repeat")) {
+    if (op == B_REPEAT) {
         output.vector = new std::vector<LispVar>;
         for (int i = 0; i < args[0].num; i++)
             (*output.vector).push_back(args[1]);
@@ -611,7 +628,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
     }
 
     // Get the {0}th element of {1}.
-    if (!op.compare("get")) {
+    if (op == B_GET) {
         auto size = args[1].size();
         auto index = args[0].num;
 
@@ -625,7 +642,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
     }
 
     // Map a function across one or more iterable, getting an iterable back.
-    if (!op.compare("map")) {
+    if (op == B_MAP) {
         output.vector = new std::vector<LispVar>;
         output.tag = LIST;
 
@@ -656,7 +673,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
         return output;
     }
 
-    if (!op.compare("fold")) {
+    if (op == B_FOLD) {
         LispVar accumulator;
         uint vec_size = args[1].vector->size();
         uint i = 0;
@@ -681,7 +698,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
     }
 
     // Generates a list using a slice-like syntax.
-    if (!op.compare("range")) {
+    if (op == B_RANGE) {
         int start = 0;
         int stop = -1;
         int step = 1;
@@ -706,7 +723,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
         }
         return output;
     }
-    if (!op.compare("slice")) {
+    if (op == B_SLICE) {
         long int start = 0;
         long int stop = -1;
         long int step = 1;
@@ -738,21 +755,19 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
         return output;
     }
 
-    if (!op.compare("eval")) {
+    if (op == B_EVAL) {
         return call_variable(
             (*args[0].vector)[0],
             {(*args[0].vector).begin() + 1, (*args[0].vector).end()});
     }
 
-    if (!op.compare("eval_expr")) { return evaluate_expression(&args[0], 1); }
+    if (op == B_EVAL_EXPR) { return evaluate_expression(&args[0], 1); }
 
     // Flow control
-    if (!op.compare("ternary")) {
-        return args[0].truthiness() ? args[1] : args[2];
-    }
+    if (op == B_TERNARY) { return args[0].truthiness() ? args[1] : args[2]; }
 
     // Numeric functions
-    if (!op.compare("add")) {
+    if (op == B_ADD) {
         if (kind == NUM) {
             output.tag = NUM;
             output.num = accumulate_l(&args, 0, std::plus<long>());
@@ -763,7 +778,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
             return output;
         }
     }
-    if (!op.compare("mul")) {
+    if (op == B_MUL) {
         if (kind == NUM) {
             output.tag = NUM;
             output.num = accumulate_l(&args, 1, std::multiplies<long>());
@@ -774,22 +789,22 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
             return output;
         }
     }
-    if (!op.compare("and")) {
+    if (op == B_AND) {
         output.tag = NUM;
         output.num = accumulate_l(&args, ~0, std::bit_and<long>());
         return output;
     }
-    if (!op.compare("or")) {
+    if (op == B_OR) {
         output.tag = NUM;
         output.num = accumulate_l(&args, 0, std::bit_or<long>());
         return output;
     }
-    if (!op.compare("xor")) {
+    if (op == B_XOR) {
         output.tag = NUM;
         output.num = accumulate_l(&args, 0, std::bit_xor<long>());
         return output;
     }
-    if (!op.compare("eq")) {
+    if (op == B_EQ) {
         // All arguments should be equal.
         output.num = true;
         output.tag = BOOL;
@@ -801,7 +816,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
         }
         return output;
     }
-    if (!op.compare("neq")) {
+    if (op == B_NEQ) {
         // All arguments should be different.
         output.num = true;
         output.tag = BOOL;
@@ -813,25 +828,25 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
         }
         return output;
     }
-    if (!op.compare("gt")) {
+    if (op == B_GT) {
         // All arguments should be strictly decreasing.
         output.tag = BOOL;
         output.num = vector_is_ordered(&args, std::greater<float>());
         return output;
     }
-    if (!op.compare("lt")) {
+    if (op == B_LT) {
         // All arguments should be strictly increasing.
         output.tag = BOOL;
         output.num = vector_is_ordered(&args, std::less<float>());
         return output;
     }
-    if (!op.compare("geq")) {
+    if (op == B_GEQ) {
         // All arguments should be non-strictly decreasing.
         output.tag = BOOL;
         output.num = vector_is_ordered(&args, std::greater_equal<float>());
         return output;
     }
-    if (!op.compare("leq")) {
+    if (op == B_LEQ) {
         // All arguments should be non-strictly increasing.
         output.tag = BOOL;
         output.num = vector_is_ordered(&args, std::less_equal<float>());
@@ -839,7 +854,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
     }
 
     // 2-ary numeric functions
-    if (!op.compare("sub")) {
+    if (op == B_SUB) {
         if (args[0].tag == NUM && args[1].tag == NUM) {
             return {NUM, args[0].num - args[1].num};
         } else {
@@ -848,19 +863,19 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
             return output;
         }
     }
-    if (!op.compare("div")) {
+    if (op == B_DIV) {
         output.tag = FLOAT;
         output.flt = NUMPART(args[0]) / NUMPART(args[1]);
         return output;
     }
-    if (!op.compare("mod")) {
+    if (op == B_MOD) {
         output.tag = NUM;
         output.num = args[0].num % args[1].num;
         return output;
     }
 
     // 1-ary numeric functions
-    if (!op.compare("neg")) {
+    if (op == B_NEG) {
         output.tag = args[0].tag;
         if (output.tag == NUM)
             output.num = -args[0].num;
@@ -869,7 +884,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
         return output;
     }
 
-    if (!op.compare("flip")) return {NUM, ~args[0].num};
+    if (op == B_FLIP) return {NUM, ~args[0].num};
 
     // Results haven't been set.
     std::cout << "ExpressionEvaluationError: Could not evaluate (" << op;
@@ -884,7 +899,13 @@ LispVar evaluate_const(std::string item) {
     LispVar output;
     bool is_function = LISP_BUILTINS.count(item);
 
-    if (is_function or !item.compare("expression")) {
+    if (is_function) {
+        output.builtin = BUILTINS_NUMS.at(item);
+        output.tag = BUILTIN;
+        return output;
+    }
+
+    if (!item.compare("expression")) {
         output.string = new std::string;
         *output.string = item;
         output.tag = BUILTIN;
@@ -938,7 +959,7 @@ LispVar evaluate_expression(LispVar *expression, uint index) {
     if (!is_function) return item;
 
     // Capture expressions literally.
-    if (!item.string->compare("expression")) {
+    if (item.builtin == B_EXPRESSION) {
         LispVar result;
         Tree<LispVar> *subtree = new Tree<LispVar>;
         *subtree = expression->tree->subtree(index);
@@ -950,7 +971,7 @@ LispVar evaluate_expression(LispVar *expression, uint index) {
 
     // Allow binding to variables.
     // This is very scuffed right now and obviously WIP.
-    if (!item.string->compare("let")) {
+    if (item.builtin == B_LET) {
         LispVar result = evaluate_expression(expression, index + 2);
         VARIABLE_SCOPE.set_var(expression->tree->nodes[index + 1].string,
                                result);

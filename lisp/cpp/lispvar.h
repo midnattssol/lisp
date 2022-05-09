@@ -13,6 +13,7 @@ The singletons are the following:
 #include <vector>
 
 #include "escape.h"
+#include "gen_builtins.h"
 #include "tree.h"
 
 #define NUMPART(a) (a.tag == NUM ? a.num : a.flt)
@@ -42,11 +43,12 @@ class LispVar {
    public:
     LispType tag;
     union {
-        long int num;                  // Used by NUM, NOTHING and BOOL.
+        long int num;                  // Used by NUM, NOTHING, BOOL.
         float flt;                     // Used by FLOAT.
-        std::string *string;           // Used by STRING, TOKEN and TYPE.
-        std::vector<LispVar> *vector;  // Used by LIST, VECTOR, and SOMETHING.
-        Tree<LispVar> *tree;           // Used by EXPRESSION to store code.
+        std::string *string;           // Used by STRING, TYPE, and VARIABLE.
+        std::vector<LispVar> *vector;  // Used by LIST.
+        Tree<LispVar> *tree;           // Used by EXPRESSION.
+        LispBuiltin builtin;           // Used by BUILTIN.
     };
 
     /* Whether or not one variable equals another. */
@@ -56,9 +58,10 @@ class LispVar {
         // If it's a singleton, tags being the same imply that the objects are
         // the same.
         if (this->is_singleton()) return true;
-        if (this->is_numeric()) { return PNUMPART(this) == NUMPART(var); }
-        if (this->tag == STRING or this->tag == BUILTIN)
-            return !(*this->string).compare(*var.string);
+        if (this->is_numeric() || this->tag == BUILTIN) {
+            return PNUMPART(this) == NUMPART(var);
+        }
+        if (this->tag == STRING) return !(*this->string).compare(*var.string);
 
         // Compare the contents.
         if (this->tag == LIST) {
