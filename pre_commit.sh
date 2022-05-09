@@ -14,3 +14,6 @@ python lisp/python/speed.py --num 100 > performance.txt
 
 # Saves the dependency tree for easy access.
 python lisp/python/includetree.py lisp/cpp/lisp.cpp > includetree.txt
+
+# Count lines of code in the repository.
+cloc . | tail -n +6 > lines.txt
