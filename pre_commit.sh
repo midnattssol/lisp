@@ -2,18 +2,18 @@
 set -xe
 
 # Recompile the Lisp.
-python lisp/python/run_lisp.py --recompile "always" -c ""
+./lisp --recompile "always" -c ""
 
 # Runs all tests.
 for i in tests/*.lisp; do
-    python lisp/python/run_lisp.py $i
+    ./lisp $i
 done
 
 # Saves the performance statistics.
-python lisp/python/speed.py --num 100 > performance.txt
+python source/python/speed.py --num 100 > performance.txt
 
 # Saves the dependency tree for easy access.
-python lisp/python/includetree.py lisp/cpp/lisp.cpp > includetree.txt
+python source/python/includetree.py source/cpp/lisp.cpp > includetree.txt
 
 # Count lines of code in the repository.
 cloc . | tail -n +6 > lines.txt

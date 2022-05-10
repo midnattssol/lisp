@@ -10,6 +10,7 @@ import typing as t
 
 import preprocess
 import utils
+import gen_code
 
 BASEPATH = p.Path(__file__).parent
 GCPP_FLAGS = ["-O1", "-fconcepts-ts"]
@@ -26,7 +27,7 @@ def _recompile_if_necessary(args):
         return
 
     # Regenerate programmatical headers.
-    _run(["python", str(BASEPATH / "generate_code.py")])
+    gen_code.render_all()
 
     # Get hashes of files.
     origin = BASEPATH.parent / "cpp" / "lisp.cpp"
@@ -128,12 +129,24 @@ def main(argv: t.List[str]) -> None:
         file.write(canon)
 
     _recompile_if_necessary(args)
+
+    executable_path = BASEPATH.parent / "lisp"
+
+    if not executable_path.exists():
+        print(
+            f"Could not find executable (searched {str(executable_path.resolve())!r})."
+        )
+        print(
+            f"Try rerunning with the `--recompile always` option set if you haven't already."
+        )
+        exit(1)
+
     _run(
         [
-            str(BASEPATH.parent / "lisp"),
+            str(executable_path),
             str(temp_path),
             str(int(args.debug)),
-            str(int(args.unsafe)),
+            str(int(not args.unsafe)),
         ]
     )
 

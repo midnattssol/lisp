@@ -1,0 +1,261 @@
+mul: [
+    '[(map type [\"*\" \"numeric\"])]'
+    'num'
+    'Multiply all arguments together, defaulting to 1.'
+]
+rand: [
+    '[(map type [\"int\"])]'
+    'list'
+    'Get a list of random integers of length equal to the argument. The numbers are generated using the MT19937 implementation of the Mersenne Twister.'
+]
+add: [
+    '[(map type [\"*\" \"numeric\"])]'
+    'num'
+    'Add all arguments together, defaulting to 0.'
+]
+or: [
+    '[(map type [\"*\" \"numeric\"])]'
+    'num'
+    'Return the bitwise `or` of all arguments, defaulting to 0.'
+]
+and: [
+    '[(map type [\"*\" \"numeric\"])]'
+    'num'
+    'Return the bitwise `and` of all arguments, defaulting to `(flip 0)`.'
+]
+xor: [
+    '[(map type [\"*\" \"numeric\"])]'
+    'num'
+    'Return the bitwise `xor` of all arguments, defaulting to 0.'
+]
+gt: [
+    '[(map type [\"*\" \"numeric\"])]'
+    'bool'
+    'Return `True` if all arguments are ordered in strictly decreasing order, or `False` otherwise.'
+]
+geq: [
+    '[(map type [\"*\" \"numeric\"])]'
+    'bool'
+    'Return `True` if all arguments are ordered in non-strictly decreasing order, or `False` otherwise.'
+]
+lt: [
+    '[(map type [\"*\" \"numeric\"])]'
+    'bool'
+    'Return `True` if all arguments are ordered in strictly increasing order, or `False` otherwise.'
+]
+leq: [
+    '[(map type [\"*\" \"numeric\"])]'
+    'bool'
+    'Return `True` if all arguments are ordered in non-strictly increasing order, or `False` otherwise.'
+]
+noop: [
+    '[(map type [\"*\"])]'
+    'nothing'
+    'Do nothing with the arguments.'
+]
+list: [
+    '[(map type [\"*\"])]'
+    'list'
+    'Construct a list containing the arguments.'
+]
+eq: [
+    '[(map type [\"*\"])]'
+    'bool'
+    'Return `True` if all elements are equal, or `False` otherwise.'
+]
+neq: [
+    '[(map type [\"*\"])]'
+    'bool'
+    'Return `True` if all elements are different, or `False` otherwise.'
+]
+typeof: [
+    '[(map type [\"any\"])]'
+    'type'
+    'Get a type object describing the type of the argument.'
+]
+repr: [
+    '[(map type [\"any\"])]'
+    'string'
+    'Get a string representation of the argument.'
+]
+put: [
+    '[(map type [\"*\"])]'
+    'nothing'
+    'Print the arguments to `stdout`.'
+]
+help: [
+    '[(map type [\"any\"])]'
+    'string'
+    'Get a help string about the argument.'
+]
+len: [
+    '[(map type [\"list\"])]'
+    'int'
+    'Get the number of elements in a list.'
+]
+eval_expr: [
+    '[(map type [\"expression\"])]'
+    'any'
+    'Evaluate an expression.'
+]
+type: [
+    '[(map type [\"string\"])]'
+    'type'
+    'Construct a type object from a typename.'
+]
+join: [
+    '[(map type [\"*\" \"list\"])]'
+    'list'
+    'Join any number of lists together.'
+]
+neg: [
+    '[(map type [\"numeric\"])]'
+    'num'
+    'Return a negative version of the number.'
+]
+flip: [
+    '[(map type [\"int\"])]'
+    'int'
+    'Flip all the bits in the number.'
+]
+mod: [
+    '[(map type [\"int\"]) (map type [\"int\"])]'
+    'int'
+    'Return $0 modulo $1.'
+]
+sub: [
+    '[(map type [\"numeric\"]) (map type [\"numeric\"])]'
+    'num'
+    'Subtract $1 from $0.'
+]
+div: [
+    '[(map type [\"numeric\"]) (map type [\"numeric\"])]'
+    'num'
+    'Divide $0 by $1.'
+]
+range: [
+    '[(map type [\"int\" \"?\"]) (map type [\"int\" \"?\"]) (map type [\"int\" \"?\" \"truthy\"])]'
+    'list'
+    'Return every $2 numbers from $0 to $1.'
+]
+insert: [
+    '[(map type [\"any\"]) (map type [\"int\"]) (map type [\"list\"])]'
+    'list'
+    'Return a copy of $2 with $0 inserted at the index $1.'
+]
+assert: [
+    '[(map type [\"booly\"]) (map type [\"string\" \"?\"])]'
+    'nothing'
+    'Check if the argument is truthy, showing an optional error message before quitting.'
+]
+bool: [
+    '[(map type [\"booly\"])]'
+    'bool'
+    'Cast the input to a boolean.'
+]
+slice: [
+    '[(map type [\"list\"]) (map type [\"int\"]) (map type [\"int\" \"?\"]) (map type [\"int\" \"?\"])]'
+    'list'
+    'Return the elements between $1 and $2 inclusive in the list, with a step size equal to the $3.'
+]
+repeat: [
+    '[(map type [\"int\"]) (map type [\"any\"])]'
+    'list'
+    'Return a list of length equal to $0 by repeating $1.'
+]
+get: [
+    '[(map type [\"int\"]) (map type [\"list\"])]'
+    'any'
+    'Get the item in $1 with index equal to $0.'
+]
+typematch: [
+    '[(map type [\"list\"]) (map type [\"list\"])]'
+    'bool'
+    'Return whether or not the type of $1 matches $0 as a type descriptor.'
+]
+map: [
+    '[(map type [\"callable\"]) (map type [\"list\" \"*\"])]'
+    'list'
+    'Return a new list with the callable applied to each element in the original list.'
+]
+fold: [
+    '[(map type [\"callable\"]) (map type [\"list\"]) (map type [\"?\"])]'
+    'any'
+    'Fold a list together using a callable and an optional accumulator.'
+    '(fold + [10 20 30 40]) ; Equivalent to (+ 40 (+ 30 (+ 10 20)))'
+]
+ternary: [
+    '[(map type [\"booly\"]) (map type [\"any\"]) (map type [\"any\"])]'
+    'any'
+    'Return $1 if $0 is truthy, otherwise $2.'
+]
+let: [
+    '[(map type [\"string\"]) (map type [\"any\"])]'
+    'any'
+    'Bind $1 to the variable name $0.'
+]
+call: [
+    '[(map type [\"callable\"]) (map type [\"any\" \"*\"])]'
+    'any'
+    'Call $0 on some arguments.'
+]
+closure: [
+    '[(map type [\"expression\"])]'
+    'closure'
+    'Construct a closure from an expression containing an argument list and an expression to evaluate.'
+]
+match: [
+    '[(map type [\"string\"]) (map type [\"string\"])]'
+    'bool'
+    'Return whether or not the regular expression $0 fully matches the string $1.'
+]
+do: [
+    '[(map type [\"+\"])]'
+    'any'
+    'Return the last of its arguments.'
+]
+while: [
+    '[(map type [\"expression\"]) (map type [\"expression\"])]'
+    'nothing'
+    'As long as the result of evaluating $0 is `True`, $1 is evaluated.'
+]
+exit: [
+    '[(map type [\"int\"])]'
+    'nothing'
+    'Exit the program with $0 as the error code.'
+]
+expression: [
+    '[(map type [\"*\"])]'
+    'expression'
+    'Construct an expression from the arguments.'
+]
+push: [
+    '[(map type [\"list\"]) (map type [\"any\"])]'
+    'nothing'
+    'Push $1 at the end of $0 in-place.'
+]
+pop: [
+    '[(map type [\"list\"])]'
+    'any'
+    'Pop the last element of $0 in-place.'
+]
+copy: [
+    '[(map type [\"any\"])]'
+    'any'
+    'Return a copy of $0.'
+]
+int: [
+    '[(map type [\"numeric\"])]'
+    'int'
+    'Cast the argument to an integer.'
+]
+float: [
+    '[(map type [\"numeric\"])]'
+    'float'
+    'Cast the argument to a float.'
+]
+seed: [
+    '[(map type [\"int\"])]'
+    'nothing'
+    'Seed the Mersenne Twister used by `rand`.'
+]

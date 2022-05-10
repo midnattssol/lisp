@@ -7,5 +7,6 @@
     "&=": {"op": "&"},
     "|=": {"op": "|"},
     ",=": {"op": ","},
-    "inplace_transform": {"op": "map", "rev": true}
+    "$=": {"op": "$"},
+    "inplace_transform!": {"op": "map", "rev": true}
 }

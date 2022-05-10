@@ -38,7 +38,7 @@ void _lisp_assert_or_exit(bool condition, std::string message) {
 /* Display an error message that a type does not implement something. */
 [[noreturn]] void _throw_does_not_implement(LispType type,
                                             std::string notimplemented) {
-    std::cout << "[UnimplementedError] LispType '" << TYPENAMES.at(type)
+    std::cout << "[NotImplementedError] LispType '" << TYPENAMES.at(type)
               << "' does not implement `" << notimplemented << "`.";
     exit(1);
 }
@@ -61,9 +61,7 @@ std::string LispVar::to_str() {
         ss << "<Variable '" << *(this->string) << "'>";
     } else if (this->tag == TYPE) {
         ss << "<Type '" << *(this->string) << "'>";
-    } else if (this->tag == EXPRESSION) {
-        ss << this->_pretty_tree();
-    } else if (this->tag == CLOSURE) {
+    } else if (this->tag == EXPRESSION || this->tag == CLOSURE) {
         ss << this->_pretty_tree();
     } else if (this->tag == NUM || this->tag == FLOAT)
         ss << PNUMPART(this);
@@ -98,8 +96,9 @@ std::string LispVar::get_help_str() {
     std::stringstream ss;
 
     if (this->tag == BUILTIN) {
-        ss << "builtin '" << BUILTINS_NAMES.at(this->builtin);
-        // << "' " << BUILTINS_TYPES[this->builtin]->to_str();
+        ss << "builtin '" << BUILTINS_NAMES.at(this->builtin)
+           << "' with signature "
+           << BUILTINS_TYPES[BUILTINS_NAMES.at(this->builtin)]->to_str();
     } else if (this->tag == TYPE) {
         return "a type";
     } else if (this->tag == EXPRESSION) {
@@ -113,7 +112,7 @@ std::string LispVar::get_help_str() {
     } else if (this->tag == STRING) {
         return "a string of characters";
     } else if (this->tag == LIST) {
-        return "a list of other items";
+        return "a list of items";
     } else {
         if (!TYPENAMES.count(this->tag)) {
             std::cout << "Error: Tag " << this->tag << " not in TYPENAMES.\n"
@@ -135,9 +134,6 @@ LispVar evaluate_expression(LispVar *expression, uint index = 1);
 
 /* Parse a Lisp expression into a tree. */
 LispVar parse_expression(std::string expression) {
-    // expression = exec("python ./preprocessor.py " +
-    // _escape_exec(expression));
-
     auto ast = new Tree<LispVar>;
     *ast = {{*_SINGLETON_NOT_SET}, {0}};
 
@@ -165,8 +161,6 @@ LispVar parse_expression(std::string expression) {
     char character;
 
     std::string string_buffer;
-
-    // toggle the call thing on and off
 
     for (size_t i = 0; i < size; i++) {
         character = expression[i];
@@ -403,6 +397,34 @@ LispVar call_closure(LispVar closure, std::vector<LispVar> arguments) {
     auto result = evaluate_expression(callable, 0);
     delete callable;
 
+    // If the result is another closure, the local variables need to be
+    // evaluated before the closure is returned to the outer scope. Otherwise,
+    // the name resolution would fail since the locals have gone out of scope.
+
+    if (result.tag == CLOSURE) {
+        std::set<std::string> variables_set_in_this_scope;
+
+        for (auto item : VARIABLE_SCOPE.scopes) {
+            auto item_max_depth = item.second.front().depth;
+            if (item_max_depth == VARIABLE_SCOPE.depth) {
+                variables_set_in_this_scope.insert(item.first);
+            }
+        }
+        std::vector<LispVar> new_nodes;
+
+        for (auto node : result.tree->nodes) {
+            if (node.tag == VARIABLE &&
+                variables_set_in_this_scope.find(*node.string) !=
+                    variables_set_in_this_scope.end()) {
+                new_nodes.push_back(VARIABLE_SCOPE.get_var(node.string));
+            } else {
+                new_nodes.push_back(node);
+            }
+        }
+
+        result.tree->nodes = new_nodes;
+    }
+
     // If it is a closure, it can get information from the surrounding
     // scope. If it is a pure function, it can't. This should be checked and
     // enforced by the Python code.
@@ -448,11 +470,19 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
     // No operation.
     if (op == B_NOOP) { return *_SINGLETON_NOTHING; }
     if (op == B_DO) { return args[arity - 1]; }
+    if (op == B_CALL) {
+        return call_variable(args[0], {args.begin() + 1, args.end()});
+    }
     if (op == B_EXIT) { exit(args[0].num); }
     if (op == B_WHILE) {
         while (evaluate_expression(&args[0]).truthiness()) {
             evaluate_expression(&args[1]);
         }
+        return *_SINGLETON_NOTHING;
+    }
+
+    if (op == B_SEED) {
+        RNG = std::mt19937(args[0].num);
         return *_SINGLETON_NOTHING;
     }
 
@@ -491,6 +521,12 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
     }
 
     // ===| Base constructors |===
+    if (op == B_INT) return {NUM, args[0].to_l()};
+    if (op == B_FLOAT) {
+        output.tag = FLOAT;
+        output.flt = args[0].to_f();
+        return output;
+    }
     if (op == B_BOOL) return {BOOL, args[0].truthiness()};
     if (op == B_TYPE) {
         output.string = new std::string;
@@ -504,7 +540,6 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
         output.tag = LIST;
         return output;
     }
-    if (op == B_SYMBOL) return args[0];
     if (op == B_CLOSURE) {
         output = args[0];
         output.tag = CLOSURE;
@@ -518,6 +553,8 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
         output.tag = STRING;
         return output;
     }
+
+    if (op == B_COPY) return args[0].copy();
 
     if (op == B_LEN) return {NUM, args[0].size()};
 
@@ -684,7 +721,6 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
             _lisp_assert_or_exit(vec_size,
                                  "FoldError: An empty list cannot be folded "
                                  "without an accumulator.\n");
-            exit(1);
             accumulator = (*args[1].vector)[0];
             i = 1;
         }
@@ -739,8 +775,8 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
         stop = (stop < 0) ? size + stop : stop;
 
         // Cut off too large indices.
-        stop = std::min(stop, size);
-        start = std::min(start, size);
+        stop = std::min(stop, size - 1);
+        start = std::min(start, size - 1);
 
         output.tag = LIST;
         output.vector = new std::vector<LispVar>;
@@ -748,17 +784,11 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
         if (stop > start && step < 0) return output;
         if (stop < start && step > 0) return output;
 
-        for (int i = start; (step > 0) ? (i < stop) : (i > stop); i += step) {
+        for (int i = start; (step > 0) ? (i <= stop) : (i >= stop); i += step) {
             (*output.vector).push_back((*args[0].vector)[i]);
         }
 
         return output;
-    }
-
-    if (op == B_EVAL) {
-        return call_variable(
-            (*args[0].vector)[0],
-            {(*args[0].vector).begin() + 1, (*args[0].vector).end()});
     }
 
     if (op == B_EVAL_EXPR) { return evaluate_expression(&args[0], 1); }
@@ -887,9 +917,9 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar> args) {
     if (op == B_FLIP) return {NUM, ~args[0].num};
 
     // Results haven't been set.
-    std::cout << "ExpressionEvaluationError: Could not evaluate (" << op;
-    auto size = args.size();
-    for (size_t i = 0; i < size; i++) std::cout << " " << args[i].to_str();
+    std::cout << "ExpressionEvaluationError: Could not evaluate ("
+              << BUILTINS_NAMES.at(op);
+    for (size_t i = 0; i < arity; i++) std::cout << " " << args[i].to_str();
     std::cout << ")\n";
     exit(1);
 }

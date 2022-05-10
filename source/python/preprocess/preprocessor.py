@@ -28,14 +28,14 @@ BOOLS = {"Yes": "True", "No": "False", "On": "True", "Off": "False"}
 
 
 class LispImportWithoutFileException(BaseException):
-    pass
+    """Raised if an import is attempted without a known file."""
 
 
 def postparse(expr: t.Any) -> str:
     """Run after parsing."""
     if isinstance(expr, int):
         if expr not in SIGNED_LONG_RANGE:
-            print(f"[ERROR] Number '{expr}' not in {SIGNED_LONG_RANGE}")
+            print(f"[ERROR] Number '{expr}' not in {SIGNED_LONG_RANGE}.")
             exit(1)
     return str(expr)
 
@@ -85,6 +85,11 @@ class Preprocessor:
     contexts: t.List[t.Optional[p.Path]] = dc.field(default_factory=lambda: [None])
     included: t.Set[p.Path] = dc.field(default_factory=set)
 
+    def make_canon(self, expr: str) -> str:
+        """Make an expression canon."""
+        assert expr.count("(") == expr.count(")")
+        return self._make_canon(expr)
+
     def __post_init__(self):
         self.macros = self._get_macros()
 
@@ -99,7 +104,7 @@ class Preprocessor:
                 return "noop"
             self.included.add(imported_path)
         else:
-            imported_path = self.contexts[-1].parent / filename
+            imported_path = self.contexts[-1].parent / (filename + ".lisp")
 
         if self.contexts[-1] is None:
             raise LispImportWithoutFileException
@@ -111,7 +116,7 @@ class Preprocessor:
         self.contexts.append(imported_path)
 
         # The indexing is necessary since the macro expects the result not to have parentheses.
-        code = self.make_canon(code)
+        code = self._make_canon(code)
         self.contexts.pop()
         return code[1:-1]
 
@@ -178,15 +183,15 @@ class Preprocessor:
 
         # Stop
         if not result[1]:
-            first = int(self.make_canon(result[0]))
+            first = int(self._make_canon(result[0]))
             result[1] = "-1" if first > 0 else "0"
 
-        return self.make_canon("(range " + " ".join(result) + ")")
+        return self._make_canon("(range " + " ".join(result) + ")")
 
     def _make_function_canon(self, expr: str) -> str:
         """Recursively canonize child tokens and expand macros."""
         expr = expr[1:-1]
-        canon_tokens = list(map(self.make_canon, tokens_of(expr)))
+        canon_tokens = list(map(self._make_canon, tokens_of(expr)))
 
         for macro in self.macros:
             if canon_tokens[0] in macro.names:
@@ -197,15 +202,14 @@ class Preprocessor:
                     exit(1)
 
                 result = f"({result})"
-                canon_tokens = tokens_of(self.make_canon(result)[1:-1])
+                canon_tokens = tokens_of(self._make_canon(result)[1:-1])
                 break
 
         return "(" + " ".join(canon_tokens) + ")"
 
     @utils.counted
     @utils.composed_with(postparse)
-    def make_canon(self, expr: str) -> str:
-        """Make an expression canon."""
+    def _make_canon(self, expr: str) -> str:
         expr = expr.strip()
 
         if expr in SHORTHANDS:
@@ -219,7 +223,9 @@ class Preprocessor:
                 expr = "(list " + expr[1:-1] + ")"
             if expr[0] == "(" and expr[-1] == ")":
                 expr = self._make_function_canon(expr)
-                if expr.startswith("((") and expr.endswith("))"):
+                # This makes the C++ code confused if it isn't fixed,
+                # since the indent gets messy.
+                if expr.startswith("(("):
                     expr = f"(call {expr[1:-1]})"
                 return expr
 
@@ -251,7 +257,7 @@ def main():
     )
     args = parser.parse_args()
     canonizer = Preprocessor()
-    print(canonizer.make_canon(args.code))
+    print(canonizer._make_canon(args.code))
 
 
 if __name__ == "__main__":

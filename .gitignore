@@ -1,5 +1,10 @@
 unused
 .source.hash
-lisp/lisp
+source/lisp
 __pycache__
 *.gch
+
+# Items below this have been automatically generated.
+grammar/grammar.cson
+source/cpp/gen.h
+source/cpp/gen_builtins.h
