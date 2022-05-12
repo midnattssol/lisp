@@ -1,31 +1,31 @@
 mul: [
     '[(map type [\"*\" \"numeric\"])]'
-    'num'
+    'numeric'
     'Multiply all arguments together, defaulting to 1.'
 ]
 rand: [
     '[(map type [\"int\"])]'
-    'list'
-    'Get a list of random integers of length equal to the argument. The numbers are generated using the MT19937 implementation of the Mersenne Twister.'
+    'vector'
+    'Get a vector of random integers of length equal to the argument. The numbers are generated using the MT19937 implementation of the Mersenne Twister.'
 ]
 add: [
     '[(map type [\"*\" \"numeric\"])]'
-    'num'
+    'numeric'
     'Add all arguments together, defaulting to 0.'
 ]
 or: [
     '[(map type [\"*\" \"numeric\"])]'
-    'num'
+    'numeric'
     'Return the bitwise `or` of all arguments, defaulting to 0.'
 ]
 and: [
     '[(map type [\"*\" \"numeric\"])]'
-    'num'
+    'numeric'
     'Return the bitwise `and` of all arguments, defaulting to `(flip 0)`.'
 ]
 xor: [
     '[(map type [\"*\" \"numeric\"])]'
-    'num'
+    'numeric'
     'Return the bitwise `xor` of all arguments, defaulting to 0.'
 ]
 gt: [
@@ -53,10 +53,15 @@ noop: [
     'nothing'
     'Do nothing with the arguments.'
 ]
+vector: [
+    '[(map type [\"*\"])]'
+    'vector'
+    'Construct a vector containing the arguments.'
+]
 list: [
     '[(map type [\"*\"])]'
     'list'
-    'Construct a list containing the arguments.'
+    'Construct a linked list containing the arguments.'
 ]
 eq: [
     '[(map type [\"*\"])]'
@@ -89,9 +94,9 @@ help: [
     'Get a help string about the argument.'
 ]
 len: [
-    '[(map type [\"list\"])]'
+    '[(map type [\"iterable\"])]'
     'int'
-    'Get the number of elements in a list.'
+    'Get the number of elements in the iterable.'
 ]
 eval_expr: [
     '[(map type [\"expression\"])]'
@@ -104,13 +109,13 @@ type: [
     'Construct a type object from a typename.'
 ]
 join: [
-    '[(map type [\"*\" \"list\"])]'
-    'list'
-    'Join any number of lists together.'
+    '[(map type [\"*\" \"vector\"])]'
+    'vector'
+    'Join any number of vectors together.'
 ]
 neg: [
     '[(map type [\"numeric\"])]'
-    'num'
+    'numeric'
     'Return a negative version of the number.'
 ]
 flip: [
@@ -125,21 +130,26 @@ mod: [
 ]
 sub: [
     '[(map type [\"numeric\"]) (map type [\"numeric\"])]'
-    'num'
+    'numeric'
     'Subtract $1 from $0.'
 ]
 div: [
     '[(map type [\"numeric\"]) (map type [\"numeric\"])]'
-    'num'
+    'numeric'
     'Divide $0 by $1.'
 ]
 range: [
     '[(map type [\"int\" \"?\"]) (map type [\"int\" \"?\"]) (map type [\"int\" \"?\" \"truthy\"])]'
-    'list'
+    'vector'
     'Return every $2 numbers from $0 to $1.'
 ]
 insert: [
-    '[(map type [\"any\"]) (map type [\"int\"]) (map type [\"list\"])]'
+    '[(map type [\"any\"]) (map type [\"int\"]) (map type [\"iterable\"])]'
+    'vector'
+    'Return a copy of $2 with $0 inserted at the index $1.'
+]
+linsert: [
+    '[(map type [\"any\"]) (map type [\"int\"]) (map type [\"iterable\"])]'
     'list'
     'Return a copy of $2 with $0 inserted at the index $1.'
 ]
@@ -154,34 +164,34 @@ bool: [
     'Cast the input to a boolean.'
 ]
 slice: [
-    '[(map type [\"list\"]) (map type [\"int\"]) (map type [\"int\" \"?\"]) (map type [\"int\" \"?\"])]'
-    'list'
-    'Return the elements between $1 and $2 inclusive in the list, with a step size equal to the $3.'
+    '[(map type [\"vector\"]) (map type [\"int\"]) (map type [\"int\" \"?\"]) (map type [\"int\" \"?\"])]'
+    'vector'
+    'Return the elements between $1 and $2 inclusive in the vector, with a step size equal to the $3.'
 ]
 repeat: [
     '[(map type [\"int\"]) (map type [\"any\"])]'
-    'list'
-    'Return a list of length equal to $0 by repeating $1.'
+    'vector'
+    'Return a vector of length equal to $0 by repeating $1.'
 ]
 get: [
-    '[(map type [\"int\"]) (map type [\"list\"])]'
+    '[(map type [\"int\"]) (map type [\"indexable\"])]'
     'any'
     'Get the item in $1 with index equal to $0.'
 ]
 typematch: [
-    '[(map type [\"list\"]) (map type [\"list\"])]'
+    '[(map type [\"vector\"]) (map type [\"vector\"])]'
     'bool'
     'Return whether or not the type of $1 matches $0 as a type descriptor.'
 ]
 map: [
-    '[(map type [\"callable\"]) (map type [\"list\" \"*\"])]'
-    'list'
-    'Return a new list with the callable applied to each element in the original list.'
+    '[(map type [\"callable\"]) (map type [\"vector\" \"*\"])]'
+    'vector'
+    'Return a new vector with the callable applied to each element in the original vector.'
 ]
 fold: [
-    '[(map type [\"callable\"]) (map type [\"list\"]) (map type [\"?\"])]'
+    '[(map type [\"callable\"]) (map type [\"vector\"]) (map type [\"?\"])]'
     'any'
-    'Fold a list together using a callable and an optional accumulator.'
+    'Fold a vector together using a callable and an optional accumulator.'
     '(fold + [10 20 30 40]) ; Equivalent to (+ 40 (+ 30 (+ 10 20)))'
 ]
 ternary: [
@@ -202,7 +212,7 @@ call: [
 closure: [
     '[(map type [\"expression\"])]'
     'closure'
-    'Construct a closure from an expression containing an argument list and an expression to evaluate.'
+    'Construct a closure from an expression containing an argument vector and an expression to evaluate.'
 ]
 match: [
     '[(map type [\"string\"]) (map type [\"string\"])]'
@@ -230,12 +240,12 @@ expression: [
     'Construct an expression from the arguments.'
 ]
 push: [
-    '[(map type [\"list\"]) (map type [\"any\"])]'
+    '[(map type [\"vector\"]) (map type [\"any\"])]'
     'nothing'
     'Push $1 at the end of $0 in-place.'
 ]
 pop: [
-    '[(map type [\"list\"])]'
+    '[(map type [\"vector\"])]'
     'any'
     'Pop the last element of $0 in-place.'
 ]

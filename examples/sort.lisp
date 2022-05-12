@@ -11,13 +11,13 @@
         (-- i)
     ))
 
-    (insert item _list)
+    (linsert item ptr _list)
 ))
 
 
 ; Get a sorted copy of a list.
 (=> insertion_sort [_list] (do
-    (= out [])
+    (= out l[])
     (= i 0)
     (= l (# _list))
 
@@ -31,7 +31,7 @@
 
 
 ; Sorts 512 numbers 4 times.
-(insertion_sort (rand 512))
-(insertion_sort (rand 512))
-(insertion_sort (rand 512))
-(insertion_sort (rand 512))
+(insertion_sort (rand 100))
+; (insertion_sort (rand 512))
+; (insertion_sort (rand 512))
+; (insertion_sort (rand 512))

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3.10
 """Utilities."""
 import hashlib
-import secrets
 import pathlib as p
+import secrets
 import typing as t
 
 import cson

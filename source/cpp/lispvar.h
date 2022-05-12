@@ -7,6 +7,7 @@ The singletons are the following:
 */
 #include <cassert>
 #include <iostream>
+#include <list>
 #include <map>
 #include <sstream>
 #include <string>
@@ -24,6 +25,7 @@ enum LispType {
     FLOAT,
     STRING,
     LIST,
+    VECTOR,
     NOTHING,
     BOOL,
     BUILTIN,
@@ -31,6 +33,17 @@ enum LispType {
     EXPRESSION,
     VARIABLE,
     CLOSURE,
+    ANY,
+    BOOLY,
+    FALSY,
+    TRUTHY,
+    NUMERIC,
+    CALLABLE,
+    ITERABLE,
+    INDEXABLE,
+    STAR,
+    QMARK,
+    PLUS,
     __NOT_SET__,
     __NO_ARGS__,
 };
@@ -45,11 +58,24 @@ class LispVar {
     union {
         long int num;                  // Used by NUM, NOTHING, BOOL.
         float flt;                     // Used by FLOAT.
-        std::string *string;           // Used by STRING, TYPE, and VARIABLE.
-        std::vector<LispVar> *vector;  // Used by LIST.
+        std::string *string;           // Used by STRING and VARIABLE.
+        std::vector<LispVar> *vector;  // Used by VECTOR.
+        std::list<LispVar> *list;      // Used by LIST.
         Tree<LispVar> *tree;           // Used by EXPRESSION.
         LispBuiltin builtin;           // Used by BUILTIN.
+        LispType type;                 // Used by TYPE.
     };
+
+    LispVar operator[](unsigned int index) {
+        if (tag == VECTOR) return (*vector)[index];
+        if (tag == LIST) {
+            auto first = list->begin();
+            std::advance(first, index);
+            return *first;
+        }
+
+        _throw_does_not_implement(tag, "index");
+    }
 
     /* Whether or not one variable equals another. */
     bool operator==(LispVar var) {
@@ -64,7 +90,7 @@ class LispVar {
         if (tag == STRING) return !(*string).compare(*var.string);
 
         // Compare the contents.
-        if (tag == LIST) {
+        if (tag == VECTOR) {
             unsigned int var_size = var.size();
             if (var_size != size()) return false;
             for (size_t i = 0; i < var_size; i++) {
@@ -91,8 +117,8 @@ class LispVar {
     bool is_callable() { return (tag == BUILTIN || tag == CLOSURE); }
 
     bool is_sized() {
-        return (tag == STRING || tag == LIST || tag == EXPRESSION ||
-                tag == CLOSURE);
+        return (tag == STRING || tag == VECTOR || tag == LIST ||
+                tag == EXPRESSION || tag == CLOSURE);
     }
 
     bool is_booly() {
@@ -108,7 +134,8 @@ class LispVar {
 
     long size() {
         if (tag == STRING) return string->size();
-        if (tag == LIST) return vector->size();
+        if (tag == VECTOR) return vector->size();
+        if (tag == LIST) return list->size();
         if (tag == EXPRESSION || tag == CLOSURE) return tree->size();
         _throw_does_not_implement(tag, "size");
     }
@@ -126,10 +153,14 @@ class LispVar {
             auto str = new std::string;
             *str = *string;
             output.string = str;
-        } else if (tag == LIST) {
+        } else if (tag == VECTOR) {
             auto vec = new std::vector<LispVar>;
             *vec = *vector;
             output.vector = vec;
+        } else if (tag == LIST) {
+            auto ls = new std::list<LispVar>;
+            *ls = *list;
+            output.list = ls;
         } else if (tag == EXPRESSION) {
             auto new_tree = new Tree<LispVar>;
             *new_tree = *tree;
@@ -203,15 +234,3 @@ LispVar parse_and_evaluate(std::string input);
 auto _SINGLETON_NOTHING = new LispVar;
 auto _SINGLETON_NOT_SET = new LispVar;
 auto _SINGLETON_NOARGS_TOKEN = new LispVar;
-
-const std::map<unsigned int, const std::string> TYPENAMES{
-    {NUM, "int"},
-    {STRING, "string"},
-    {FLOAT, "float"},
-    {LIST, "list"},
-    {NOTHING, "nothing"},
-    {BOOL, "bool"},
-    {BUILTIN, "builtin"},
-    {TYPE, "type"},
-    {EXPRESSION, "expression"},
-    {CLOSURE, "function"}};

@@ -23,22 +23,22 @@ _Signature: `[* numeric] -> bool`_
 Return `True` if all arguments are ordered in strictly increasing order, or `False` otherwise.
 
 ## `or`
-_Signature: `[* numeric] -> num`_
+_Signature: `[* numeric] -> numeric`_
 
 Return the bitwise `or` of all arguments, defaulting to 0.
 
 ## `add`
-_Signature: `[* numeric] -> num`_
+_Signature: `[* numeric] -> numeric`_
 
 Add all arguments together, defaulting to 0.
 
 ## `and`
-_Signature: `[* numeric] -> num`_
+_Signature: `[* numeric] -> numeric`_
 
 Return the bitwise `and` of all arguments, defaulting to `(flip 0)`.
 
 ## `div`
-_Signature: `[numeric] [numeric] -> num`_
+_Signature: `[numeric] [numeric] -> numeric`_
 
 Divide $0 by $1.
 
@@ -48,7 +48,7 @@ _Signature: `[* numeric] -> bool`_
 Return `True` if all arguments are ordered in non-strictly decreasing order, or `False` otherwise.
 
 ## `get`
-_Signature: `[int] [list] -> any`_
+_Signature: `[int] [indexable] -> any`_
 
 Get the item in $1 with index equal to $0.
 
@@ -58,9 +58,9 @@ _Signature: `[numeric] -> int`_
 Cast the argument to an integer.
 
 ## `len`
-_Signature: `[list] -> int`_
+_Signature: `[iterable] -> int`_
 
-Get the number of elements in a list.
+Get the number of elements in the iterable.
 
 ## `leq`
 _Signature: `[* numeric] -> bool`_
@@ -73,9 +73,9 @@ _Signature: `[string] [any] -> any`_
 Bind $1 to the variable name $0.
 
 ## `map`
-_Signature: `[callable] [list *] -> list`_
+_Signature: `[callable] [vector *] -> vector`_
 
-Return a new list with the callable applied to each element in the original list.
+Return a new vector with the callable applied to each element in the original vector.
 
 ## `mod`
 _Signature: `[int] [int] -> int`_
@@ -83,12 +83,12 @@ _Signature: `[int] [int] -> int`_
 Return $0 modulo $1.
 
 ## `mul`
-_Signature: `[* numeric] -> num`_
+_Signature: `[* numeric] -> numeric`_
 
 Multiply all arguments together, defaulting to 1.
 
 ## `neg`
-_Signature: `[numeric] -> num`_
+_Signature: `[numeric] -> numeric`_
 
 Return a negative version of the number.
 
@@ -98,7 +98,7 @@ _Signature: `[*] -> bool`_
 Return `True` if all elements are different, or `False` otherwise.
 
 ## `pop`
-_Signature: `[list] -> any`_
+_Signature: `[vector] -> any`_
 
 Pop the last element of $0 in-place.
 
@@ -108,12 +108,12 @@ _Signature: `[*] -> nothing`_
 Print the arguments to `stdout`.
 
 ## `sub`
-_Signature: `[numeric] [numeric] -> num`_
+_Signature: `[numeric] [numeric] -> numeric`_
 
 Subtract $1 from $0.
 
 ## `xor`
-_Signature: `[* numeric] -> num`_
+_Signature: `[* numeric] -> numeric`_
 
 Return the bitwise `xor` of all arguments, defaulting to 0.
 
@@ -143,9 +143,9 @@ _Signature: `[int] -> int`_
 Flip all the bits in the number.
 
 ## `fold`
-_Signature: `[callable] [list] [?] -> any`_
+_Signature: `[callable] [vector] [?] -> any`_
 
-Fold a list together using a callable and an optional accumulator.
+Fold a vector together using a callable and an optional accumulator.
 
 ### Examples
 
@@ -157,14 +157,14 @@ _Signature: `[any] -> string`_
 Get a help string about the argument.
 
 ## `join`
-_Signature: `[* list] -> list`_
+_Signature: `[* vector] -> vector`_
 
-Join any number of lists together.
+Join any number of vectors together.
 
 ## `list`
 _Signature: `[*] -> list`_
 
-Construct a list containing the arguments.
+Construct a linked list containing the arguments.
 
 ## `noop`
 _Signature: `[*] -> nothing`_
@@ -172,14 +172,14 @@ _Signature: `[*] -> nothing`_
 Do nothing with the arguments.
 
 ## `push`
-_Signature: `[list] [any] -> nothing`_
+_Signature: `[vector] [any] -> nothing`_
 
 Push $1 at the end of $0 in-place.
 
 ## `rand`
-_Signature: `[int] -> list`_
+_Signature: `[int] -> vector`_
 
-Get a list of random integers of length equal to the argument. The numbers are generated using the MT19937 implementation of the Mersenne Twister.
+Get a vector of random integers of length equal to the argument. The numbers are generated using the MT19937 implementation of the Mersenne Twister.
 
 ## `repr`
 _Signature: `[any] -> string`_
@@ -207,14 +207,14 @@ _Signature: `[string] [string] -> bool`_
 Return whether or not the regular expression $0 fully matches the string $1.
 
 ## `range`
-_Signature: `[int ?] [int ?] [int ? truthy] -> list`_
+_Signature: `[int ?] [int ?] [int ? truthy] -> vector`_
 
 Return every $2 numbers from $0 to $1.
 
 ## `slice`
-_Signature: `[list] [int] [int ?] [int ?] -> list`_
+_Signature: `[vector] [int] [int ?] [int ?] -> vector`_
 
-Return the elements between $1 and $2 inclusive in the list, with a step size equal to the $3.
+Return the elements between $1 and $2 inclusive in the vector, with a step size equal to the $3.
 
 ## `while`
 _Signature: `[expression] [expression] -> nothing`_
@@ -227,24 +227,34 @@ _Signature: `[booly] [string ?] -> nothing`_
 Check if the argument is truthy, showing an optional error message before quitting.
 
 ## `insert`
-_Signature: `[any] [int] [list] -> list`_
+_Signature: `[any] [int] [iterable] -> vector`_
 
 Return a copy of $2 with $0 inserted at the index $1.
 
 ## `repeat`
-_Signature: `[int] [any] -> list`_
+_Signature: `[int] [any] -> vector`_
 
-Return a list of length equal to $0 by repeating $1.
+Return a vector of length equal to $0 by repeating $1.
 
 ## `typeof`
 _Signature: `[any] -> type`_
 
 Get a type object describing the type of the argument.
 
+## `vector`
+_Signature: `[*] -> vector`_
+
+Construct a vector containing the arguments.
+
 ## `closure`
 _Signature: `[expression] -> closure`_
 
-Construct a closure from an expression containing an argument list and an expression to evaluate.
+Construct a closure from an expression containing an argument vector and an expression to evaluate.
+
+## `linsert`
+_Signature: `[any] [int] [iterable] -> list`_
+
+Return a copy of $2 with $0 inserted at the index $1.
 
 ## `ternary`
 _Signature: `[booly] [any] [any] -> any`_
@@ -257,7 +267,7 @@ _Signature: `[expression] -> any`_
 Evaluate an expression.
 
 ## `typematch`
-_Signature: `[list] [list] -> bool`_
+_Signature: `[vector] [vector] -> bool`_
 
 Return whether or not the type of $1 matches $0 as a type descriptor.
 

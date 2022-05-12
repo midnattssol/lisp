@@ -1,4 +1,5 @@
 """Render Mako templates automagically."""
+import logging
 import pathlib as p
 import typing as t
 
@@ -17,6 +18,7 @@ BASEPATH = p.Path(__file__).parent.resolve()
 SHORTHANDS = _load_data("shorthands.cson")
 PREFIX_EQUALS = _load_data("prefix_equals.cson")
 SIGNATURES = _load_data("builtins.cson")
+TYPES = _load_data("types.cson")
 
 SIGNATURES = dict(sorted(SIGNATURES.items(), key=lambda x: (len(x[0]), x[0])))
 
@@ -64,18 +66,14 @@ def _render_file(filename: p.Path) -> p.Path:
         UNIQUE_SIGNATURES=UNIQUE_SIGNATURES,
         SHORTHANDS=SHORTHANDS,
         PREFIX_EQUALS=PREFIX_EQUALS,
+        TYPES=TYPES,
         _escape=_escape,
         _builtin2enum=_builtin2enum,
         _parse_signature=_parse_signature,
         _regex_joined=_regex_joined,
     )
 
-    target = filename.parent / filename.name.removesuffix(".mako")
-
-    with target.open("w", encoding="utf-8") as file:
-        file.write(result)
-
-    return target
+    return result
 
 
 def _update_gitignore(targets: t.List[p.Path]) -> None:
@@ -105,22 +103,34 @@ def _walk_recursive(directory: p.Path):
             yield file
 
 
-def render_all(debug: bool = False) -> None:
+def render_all() -> None:
     """Render all Mako files."""
     to_ignore = []
+    filecount = 0
     basedir = BASEPATH / ".." / ".."
+    line_count = 0
+    logging.debug(
+        f"Rendering all Mako files in the directory '{basedir.absolute()!r}'."
+    )
 
     for file in _walk_recursive(basedir):
         if file.name.endswith(".mako"):
-            if debug:
-                print(f"Rendering {file.name!r}.")
-            target = _render_file(file)
+            logging.debug(f"Rendering {file.name!r}.")
+
+            code = _render_file(file)
+            line_count += code.count("\n") + 1
+            target = file.parent / file.name.removesuffix(".mako")
+
+            with target.open("w", encoding="utf-8") as file:
+                file.write(code)
 
             if target.suffix != ".md":
                 to_ignore.append(target)
+            filecount += 1
 
+    logging.debug(f"Generated {line_count} lines of code across {filecount} files.")
     _update_gitignore(to_ignore)
 
 
 if __name__ == "__main__":
-    render_all(debug=True)
+    render_all()

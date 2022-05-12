@@ -2,11 +2,11 @@
 set -xe
 
 # Recompile the Lisp.
-./lisp --recompile "always" -c ""
+./lisp --recompile "always" --log DEBUG -c ""
 
 # Runs all tests.
 for i in tests/*.lisp; do
-    ./lisp $i
+    ./lisp --log DEBUG $i
 done
 
 # Saves the performance statistics.

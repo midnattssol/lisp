@@ -3,14 +3,15 @@
 import argparse
 import functools as ft
 import hashlib
+import logging
 import pathlib as p
 import subprocess
 import sys
 import typing as t
 
+import gen_code
 import preprocess
 import utils
-import gen_code
 
 BASEPATH = p.Path(__file__).parent
 GCPP_FLAGS = ["-O1", "-fconcepts-ts"]
@@ -24,31 +25,38 @@ def _run(*args, **kwargs):
 
 def _recompile_if_necessary(args):
     if args.recompile == "never":
+        logging.debug(f"Skipping recompilation (--recompile={args.recompile!r}).")
         return
+
+    logging.debug(f"Recompiling code (--recompile={args.recompile!r}).")
 
     # Regenerate programmatical headers.
     gen_code.render_all()
 
     # Get hashes of files.
     origin = BASEPATH.parent / "cpp" / "lisp.cpp"
-    files2hash = [
-        origin,
-        *(i for i in (BASEPATH.parent / "cpp").iterdir() if i.suffix == ".h"),
-    ]
-    digest = ft.reduce(
-        lambda a, b: a ^ b, (int(utils.hash_file(f), base=16) for f in files2hash)
-    )
-    digest = hex(digest).removeprefix("0x")
-    hash_path = BASEPATH.parent / "cpp" / ".source.hash"
-    files_changed = digest != utils.cat(hash_path)
+    files_changed = False
+
+    if args.recompile != "always":
+        files2hash = [
+            origin,
+            *(i for i in (BASEPATH.parent / "cpp").iterdir() if i.suffix == ".h"),
+        ]
+        digest = ft.reduce(
+            lambda a, b: a ^ b, (int(utils.hash_file(f), base=16) for f in files2hash)
+        )
+        digest = hex(digest).removeprefix("0x")
+        hash_path = BASEPATH.parent / "cpp" / ".source.hash"
+        files_changed = digest != utils.cat(hash_path)
+        logging.debug(f"Hashed files in directory (digest: {digest}).")
 
     # Perform the recompilation.
     if args.recompile == "always" or files_changed:
-        if args.debug:
-            print("[DEBUG] The executable has changed and needs to be recompiled.")
-
+        logging.debug("Recompiling the executable with g++.")
         _run(["g++", *GCPP_FLAGS, "-o", str(BASEPATH.parent / "lisp"), origin])
 
+    # Write the hash again.
+    if files_changed:
         with open(hash_path, "w", encoding="utf-8") as file:
             file.write(digest)
 
@@ -64,11 +72,10 @@ def main(argv: t.List[str]) -> None:
         help="the lisp file to run",
     )
     parser.add_argument(
-        "--debug",
-        action="store_const",
-        const=True,
-        default=False,
-        help="activate debug mode",
+        "--log",
+        default="NEVER",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "NEVER"],
+        help="logging level",
     )
     parser.add_argument(
         "--dump",
@@ -99,10 +106,16 @@ def main(argv: t.List[str]) -> None:
     args = parser.parse_args()
     processor = preprocess.Preprocessor()
 
+    if args.log != "NEVER":
+        logging.basicConfig(level=getattr(logging, args.log.upper()))
+
     if args.origin is None:
         if args.code is None:
-            print("Error: Either the origin or --code options must be in use.")
+            logging.error(
+                "Either an origin file or code passed with -c must be provided."
+            )
             exit(1)
+
         file_contents = args.code
 
     else:
@@ -133,19 +146,20 @@ def main(argv: t.List[str]) -> None:
     executable_path = BASEPATH.parent / "lisp"
 
     if not executable_path.exists():
-        print(
+        logging.error(
             f"Could not find executable (searched {str(executable_path.resolve())!r})."
         )
-        print(
-            f"Try rerunning with the `--recompile always` option set if you haven't already."
-        )
+        if args.recompile != "always":
+            logging.error("Try rerunning with the `--recompile always` option.")
         exit(1)
+
+    logging.info("Running executable.")
 
     _run(
         [
             str(executable_path),
             str(temp_path),
-            str(int(args.debug)),
+            str(0),
             str(int(not args.unsafe)),
         ]
     )

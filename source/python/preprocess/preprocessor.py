@@ -8,7 +8,6 @@ a:b:c -> (range a b c)
 """
 import argparse
 import dataclasses as dc
-import functools as ft
 import pathlib as p
 import string
 import typing as t
@@ -220,7 +219,9 @@ class Preprocessor:
             if expr[0] == "{" and expr[-1] == "}":
                 expr = "(expression " + expr[1:-1] + ")"
             if expr[0] == "[" and expr[-1] == "]":
-                expr = "(list " + expr[1:-1] + ")"
+                expr = "(vector " + expr[1:-1] + ")"
+            if expr.startswith("l[") and expr[-1] == "]":
+                expr = "(list " + expr[2:-1] + ")"
             if expr[0] == "(" and expr[-1] == ")":
                 expr = self._make_function_canon(expr)
                 # This makes the C++ code confused if it isn't fixed,
