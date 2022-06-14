@@ -4,8 +4,8 @@
 ; Convolves two lists together.
 ; For an intuitive explanation of a convolution, see
 ; https://betterexplained.com/articles/intuitive-convolution.
-(=> convolve_lists [kernel signal] (do
-    (= kernel ($ kernel -1 0 -1))
+(=> convolve [kernel signal] (do
+    (= kernel (reverse! kernel))
     (= n (# kernel))
     (= out [])
 
@@ -26,12 +26,12 @@
 
 ; Return all items of the resulting convolution where the kernel and signal
 ; overlap completely, so no boundaries are visible.
-(=> convolve_lists_valid [kernel signal] (do
+(=> convolve_valid [kernel signal] (do
     (= offset (// (# kernel) 2))
     (+= offset 1)
-    ($ (convolve_lists kernel signal) offset (neg (+ offset 1)))
+    ($ (convolve kernel signal) offset (neg (+ offset 1)))
 ))
 
 
-(= result (convolve_lists_valid (repeat 3 (// 1. 3.)) [1 2 3 4 1]))
+(= result (convolve_valid (repeat 3 (// 1. 3.)) [1 2 3 4 1]))
 (put result)

@@ -27,13 +27,13 @@
 
 ; Take from an iterable until the closure returns False.
 (=> take_while [fn iter] (do
-    (= i (?? (find_where fn iter No) 0))
+    (= i (default_on_nil (find_where fn iter No) 0))
     (-- i)
     (if! i (slice iter 0 i) [])
 ))
 
 ; Take from an iterable from the point that the closure returns False.
 (=> drop_while [fn iter] (do
-    (= i (?? (find_where fn iter No) -1))
+    (= i (default_on_nil (find_where fn iter No) -1))
     (if! (> i 0) (slice iter i) [])
 ))

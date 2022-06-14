@@ -1,9 +1,9 @@
 (use! "math")
 
 ; Short-circuit Nil.
-(=> coalesce [_ default] (? (== _ Nil) default _))
+(=> nil? (? (== _ Nil)))
+(=> default_on_nil [_ x] (? (nil? _) x _))
 (=> ?> [fn _] (unless! (== _ Nil) (fn _)))
-(= ?? coalesce)
 
 (=> is_type? [a typename]
     (typematch [[(type typename)]] [a])
@@ -15,18 +15,6 @@
 
 (=> ,, [l r] (, (always_iterable l) (always_iterable r)))
 
-(=> zip [a b] (do
-    (= out [])
-    (= i 0)
-    (= l (min_2 (# a) (# b)))
-
-    (while! (< i l) (do
-        (push out [(@ i a) (@ i b)])
-        (++ i)
-    ))
-
-    out
-))
 
 (=> filter [f a] (do
     (= out [])
