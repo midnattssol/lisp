@@ -41,3 +41,8 @@
 
 
 (= /? filter)
+
+(=> compose [fn0 fn1] #[fn0 (fn1 _)])
+(=> after [fn0 fn1] #[fn1 (fn0 _)])
+(= <.. compose)
+(= ..> after)

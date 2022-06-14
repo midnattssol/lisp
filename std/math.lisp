@@ -11,7 +11,7 @@
 (=> max (/ max_2 _))
 (=> min (/ min_2 _))
 (=> abs (* _ (sgn _)))
-(=> ** [base exp] (/ * (repeat exp base)))
+(=> ** [base exp] (/ * (repeat exp base) 1))
 (=> >> [i offset] (// i (** 2 offset)))
 (=> << [i offset] (* i (** 2 offset)))
 

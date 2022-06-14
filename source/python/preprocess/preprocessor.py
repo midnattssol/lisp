@@ -239,6 +239,16 @@ class Preprocessor:
                 func=lambda args: f'@ -1 {" ".join(args)}',
             ),
             Macro(
+                "&&",
+                arity=1,
+                func=lambda args: f'& {" ".join(f"(bool {i})" for i in args)}',
+            ),
+            Macro(
+                "||",
+                arity=Arity.any(),
+                func=lambda args: f'| {" ".join(f"(bool {i})" for i in args)}',
+            ),
+            Macro(
                 "push!",
                 arity=2,
                 func=lambda args: f"insert {args[0]} -1 {args[1]}",

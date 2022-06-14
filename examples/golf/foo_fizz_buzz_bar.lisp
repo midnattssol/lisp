@@ -1,14 +1,14 @@
 (use! "itertools")
 
 ; https://code.golf/foo-fizz-buzz-bar
-(=> foo_fizz_buzz_bar (do
-    (= nums [2 3 5 7])
+(=> foo_fizz_buzz_bar [x] (do
     (= words ["Foo" "Fizz" "Buzz" "Bar"])
-    (.= nums (-> [n] (! (% _ n))))
+    (= nums [2 3 5 7])
+    (.= nums #[! (% x _)])
     (. put (if!
         (/ | nums)
-        (compress nums words)
-        [_]
+        (.@ nums words)
+        [x]
     ))
     (put "\n")
 ))

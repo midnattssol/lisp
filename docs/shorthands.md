@@ -10,7 +10,6 @@
 | `^` | `xor` |
 | `!` | `not` |
 | `.` | `map` |
-| `ı` | `range` |
 | `/` | `fold` |
 | `\` | `accumulate` |
 | `$` | `slice` |

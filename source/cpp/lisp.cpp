@@ -96,12 +96,12 @@ std::string LispVar::to_str() {
         ss << "]";
     } else if (this->tag == LIST) {
         size = this->list->size();
-        ss << "[";
+        ss << "<";
         for (size_t i = 0; i < size; i++) {
             ss << (*this)[i].to_repr();
             if (i != (size - 1)) { ss << " "; }
         }
-        ss << "]";
+        ss << ">";
     } else {
         if (!TYPENAMES.count(this->tag)) {
             std::cout << "Error: Tag " << this->tag << " not in TYPENAMES.\n";
