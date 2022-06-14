@@ -1,18 +1,16 @@
 (use! "math")
 
-; Short-circuit nothing.
-(=> ?? {_ default} (? (== _ Nothing) default _))
-(=> ?> {fn _} (if! (== _ Nothing) Nothing (fn _)))
+; Short-circuit Nil.
+(=> coalesce [_ default] (? (== _ Nil) default _))
+(=> ?> [fn _] (unless! (== _ Nil) (fn _)))
+(= ?? coalesce)
 
-(=> is_type [a typename]
+(=> is_type? [a typename]
     (typematch [[(type typename)]] [a])
 )
 
 (=> always_iterable (
-    if!
-        (is_type _ "list")
-        _
-        [_]
+    if! (is_type? _ "list") _ [_]
 ))
 
 (=> ,, [l r] (, (always_iterable l) (always_iterable r)))
@@ -35,8 +33,11 @@
     (= i 0)
     (= l (# a))
     (while! (< i l) (do
-        (if! (f (@ i a)) (push out (@ i a)) Nothing)
+        (if! (f (@ i a)) (push out (@ i a)))
         (++ i)
     ))
     out
 ))
+
+
+(= /? filter)

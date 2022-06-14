@@ -11,6 +11,10 @@
         name: 'comment'
     }
     {
+        match: '[\\(\\{\\[\\]\\}\\):]'
+        name: 'punctuation'
+    }
+    {
         # This is actually a macro, but I don't know the proper name
         # And the highlighting looks nice with this
         match: '\\w+!'
@@ -21,7 +25,7 @@
         name: 'storage'
     }
     {
-        match: '${_regex_joined([i for i in SHORTHANDS if i != "="], "|")}'
+        match: '(?<!\\w)(${_regex_joined([i for i in SHORTHANDS if i != "="], "|")})(?!\\w)'
         name: 'keyword.operator'
     }
     {
@@ -56,7 +60,7 @@
         )
     }
     {
-        match: '\\b(Nothing|True|False|Yes|No|On|Off)\\b'
+        match: '\\b(Nothing|Nil|True|False|Yes|No|On|Off)\\b'
         name: 'constant'
     }
     {
@@ -64,7 +68,7 @@
         name: 'entity.name.function'
     }
     {
-        match: '[({\\[\\]}):]'
-        name: 'punctuation'
+        match: '\\w(\\w|[-_+?])*'
+        name: 'variable'
     }
 ]

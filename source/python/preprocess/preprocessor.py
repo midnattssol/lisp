@@ -15,6 +15,7 @@ import typing as t
 import regex as re
 import utils
 
+from .errors import SourceError
 from .macro import Arity, BadMacroArity, Macro
 from .numbers import NUMBER_REGEX, SIGNED_LONG_RANGE, get_numeric_or_none
 
@@ -23,7 +24,7 @@ from .numbers import NUMBER_REGEX, SIGNED_LONG_RANGE, get_numeric_or_none
 BASEPATH = p.Path(__file__).parent.parent
 SHORTHANDS = utils.cson_from_path(BASEPATH.parent / "data" / "shorthands.cson")
 MODIFY_IN_PLACE = utils.cson_from_path(BASEPATH.parent / "data" / "prefix_equals.cson")
-BOOLS = {"Yes": "True", "No": "False", "On": "True", "Off": "False"}
+BOOLS = {"True": "Yes", "False": "No", "On": "Yes", "Off": "No", "Nothing": "Nil"}
 
 
 class LispImportWithoutFileException(BaseException):
@@ -39,9 +40,24 @@ def postparse(expr: t.Any) -> str:
     return str(expr)
 
 
-def tokens_of(expr: str) -> t.List[str]:
+@dc.dataclass
+class Token:
+    index: int
+    data: str
+
+    def __bool__(self):
+        return bool(self.data)
+
+    def __str__(self):
+        return self.data
+
+    def range(self):
+        return range(self.index, self.index + len(self.data))
+
+
+def tokens_of(expr: str, not_as_str=False, include_comments=False) -> t.List[str]:
     """Tokenize an expression."""
-    tokens = [""]
+    tokens = [Token(0, "")]
     in_string_literal = False
     depth = 0
     line_is_comment = False
@@ -52,7 +68,14 @@ def tokens_of(expr: str) -> t.List[str]:
         line_is_comment &= char != "\n"
 
         if line_is_comment:
+            if include_comments and not tokens[-1].data.startswith(";"):
+                tokens.append(Token(i, char))
+            else:
+                tokens[-1].data += char
             continue
+
+        if include_comments and tokens[-1].data.startswith(";"):
+            tokens.append(Token(i, ""))
 
         d_depth = (char in "([{") - (char in "}])")
         depth += d_depth
@@ -62,8 +85,8 @@ def tokens_of(expr: str) -> t.List[str]:
             in_string_literal |= not in_string_literal and char == '"'
 
         if not (in_string_literal or depth) and re.match(r"\s", char):
-            if tokens[-1]:
-                tokens.append("")
+            if tokens[-1].data:
+                tokens.append(Token(i, ""))
             continue
 
         if last_was_escape and char == "\\":
@@ -71,9 +94,17 @@ def tokens_of(expr: str) -> t.List[str]:
         else:
             last_was_escape = char == "\\"
 
-        tokens[-1] += char
+        if not tokens[-1]:
+            tokens[-1].index = i
+        tokens[-1].data += char
 
-    tokens = [t for t in tokens if any(map(lambda x: x not in string.whitespace, t))]
+    tokens = [
+        t for t in tokens if any(map(lambda x: x not in string.whitespace, t.data))
+    ]
+
+    if not not_as_str:
+        tokens = [t.data for t in tokens]
+
     return tokens
 
 
@@ -83,11 +114,16 @@ class Preprocessor:
 
     contexts: t.List[t.Optional[p.Path]] = dc.field(default_factory=lambda: [None])
     included: t.Set[p.Path] = dc.field(default_factory=set)
+    # Ranges corresponding to the tokens
+    _traceback: t.List[range] = dc.field(default_factory=list)
+    _code: str = None
 
     def make_canon(self, expr: str) -> str:
         """Make an expression canon."""
+        expr = f"(do {expr})"
+        self._code = expr
         assert expr.count("(") == expr.count(")")
-        return self._make_canon(expr)
+        return self._make_canon(expr, stack=True)
 
     def __post_init__(self):
         self.macros = self._get_macros()
@@ -100,16 +136,16 @@ class Preprocessor:
         if std:
             imported_path = BASEPATH.parent.parent / "std" / (filename + ".lisp")
             if imported_path in self.included:
-                return "noop"
+                return "do"
             self.included.add(imported_path)
         else:
             imported_path = self.contexts[-1].parent / (filename + ".lisp")
 
-        if self.contexts[-1] is None:
-            raise LispImportWithoutFileException
+            if self.contexts[-1] is None:
+                raise LispImportWithoutFileException
 
         code = utils.cat(imported_path)
-        code = f"(noop {code})"
+        code = f"(do {code})"
 
         # Make upcoming imports come from this path.
         self.contexts.append(imported_path)
@@ -120,39 +156,134 @@ class Preprocessor:
         return code[1:-1]
 
     def _get_macros(self):
-        def _dfn(args):
+        def switch_fn(args):
+            name = args.pop(0)
+            code = "\n(if! {condition} {yes} {no})"
+            base_code = code
+
+            while args:
+                item = args.pop(0)
+                tokenized = tokens_of(item[1:-1])
+
+                is_well_formed = tokenized[0] == "case"
+                is_well_formed &= len(tokenized) == 3
+
+                if not args:
+                    is_well_formed = tokenized[0] == "otherwise"
+                    is_well_formed &= len(tokenized) == 2
+
+                assert is_well_formed
+
+                if tokenized[0] == "otherwise":
+                    code = code.replace("(if! {condition} {yes} {no})", tokenized[1])
+                else:
+                    code = code.format(
+                        condition=f"(== {tokenized[1]} {name})",
+                        yes=tokenized[2],
+                        no="%s",
+                    )
+                    code %= base_code if args else "Nil"
+
+            return code[2:-1]
+
+        def dfn(args):
             if len(args) == 1:
                 args.insert(0, "{_}")
             assert len(args) == 2
             res = f"closure (expression {args[0]} {args[1]})"
             return res
 
+        def over_fn(args):
+            ftokens = tokens_of(args[0][1:-1])
+            assert len(ftokens) in range(2, 5) and ftokens[0] == "vector"
+            ftokens.pop(0)
+            if len(ftokens) == 2:
+                ftokens.append("__index__")
+            if len(ftokens) == 3:
+                ftokens.append("__length__")
+
+            res = (
+                self._make_canon(f"(= {ftokens[2]} 0)"),
+                self._make_canon(f"(= {ftokens[3]} (# {ftokens[0]}))"),
+                self._make_canon(
+                    f" (while! (< {ftokens[2]} {ftokens[3]}) (do (= item (@ {ftokens[2]} {ftokens[0]})) {' '.join(args[1:])} (++ {ftokens[2]})))"
+                ),
+            )
+            # print(self._make_canon("(noop" + res + ")") == "(noop" + res + ")")
+            return " ".join(res)[1:-1]
+
         macros = [
             Macro(
-                ["??", "call_ncol!"],
-                "eval_expr (? {args[0]} (expression {args[1]}) (expression Nothing))",
-                arity=2,
+                "if!",
+                func=lambda args: f"eval_expr (? {args[0]} (expression {args[1]}) (expression {args[2] if len(args) >= 3 else 'Nil'}))",
+                arity=Arity(2, 3),
             ),
             Macro(
-                "if!",
-                "eval_expr (? {args[0]} (expression {args[1]}) (expression {args[2]}))",
-                arity=3,
+                "unless!",
+                func=lambda args: f"if! {args[0]} {args[2] if len(args) >= 3 else 'Nil'} {args[1]}",
+                arity=Arity(2, 3),
+            ),
+            Macro(
+                "putl!",
+                arity=Arity.any(),
+                func=lambda args: f'put {" ".join(args)} "\\n"',
+            ),
+            Macro(
+                "head!",
+                arity=1,
+                func=lambda args: f'@ 0 {" ".join(args)}',
+            ),
+            Macro(
+                "tail!",
+                arity=1,
+                func=lambda args: f'@ -1 {" ".join(args)}',
+            ),
+            Macro(
+                "push!",
+                arity=2,
+                func=lambda args: f"insert {args[0]} -1 {args[1]}",
+            ),
+            Macro(
+                "pop!",
+                arity=1,
+                func=lambda args: f'slice {" ".join(args)} 0 -2',
             ),
             Macro(
                 ["=>", "def!"],
                 arity=Arity(2, 3),
-                func=lambda args: f"let {args[0]} ({_dfn(args[1:])})",
+                func=lambda args: f"let {args[0]} ({dfn(args[1:])})",
             ),
             Macro(
                 "while!",
-                arity=2,
-                fmt="while (expression {args[0]}) (expression {args[1]})",
+                arity=Arity.min(2),
+                func=lambda args: f"while (expression {args[0]}) (expression (do {' '.join(args[1:])}))",
+            ),
+            Macro(
+                "loop!",
+                arity=Arity.min(1),
+                func=lambda args: f"while! Yes {' '.join(args)}",
+            ),
+            Macro(
+                "reverse!",
+                arity=Arity(1),
+                func=lambda args: f"slice {args[0]} -1 0 -1",
+            ),
+            Macro(
+                "for!",
+                arity=Arity.min(2),
+                func=over_fn,
+            ),
+            Macro(
+                "where!",
+                arity=Arity.min(3),
+                func=lambda args: f"for! {args[0]} (if! {args[1]} {' '.join(args[2:])})",
             ),
             Macro("include!", arity=1, func=lambda args: self._import(args[0])),
+            Macro("switch", arity=Arity.min(1), func=switch_fn),
             Macro("use!", arity=1, func=lambda args: self._import(args[0], std=True)),
             Macro(["++"], arity=1, fmt="let {args[0]} (+ {args[0]} 1)"),
             Macro(["--"], arity=1, fmt="let {args[0]} (- {args[0]} 1)"),
-            Macro(["λ", "lambda!"], Arity(1, 2), func=_dfn),
+            Macro(["λ", "lambda!", "->"], Arity(1, 2), func=dfn),
         ]
 
         # Add the in-place operators as macros.
@@ -190,32 +321,67 @@ class Preprocessor:
     def _make_function_canon(self, expr: str) -> str:
         """Recursively canonize child tokens and expand macros."""
         expr = expr[1:-1]
-        canon_tokens = list(map(self._make_canon, tokens_of(expr)))
+        tokens = tokens_of(expr, not_as_str=True)
+        tokens = [Token(i.index + 1 + self._last_token_start(), i.data) for i in tokens]
+        canon_tokens = []
+
+        for i in tokens:
+            self._traceback.append(i.range())
+            canon_tokens.append(self._make_canon(i.data))
+            self._traceback.pop()
+
+        self._traceback.append(tokens[0].range())
 
         for macro in self.macros:
             if canon_tokens[0] in macro.names:
                 try:
                     result = macro.format_or_throw(canon_tokens)
                 except BadMacroArity as a:
-                    print(repr(a))
+                    error = SourceError(
+                        self._code,
+                        self._traceback[-1].start,
+                        self._traceback[-1].stop,
+                        "E0",
+                        "Incorrect macro arity",
+                        under_msg=repr(a),
+                        ansi=True,
+                    )
+                    print(f"\n{error}\n")
                     exit(1)
 
                 result = f"({result})"
                 canon_tokens = tokens_of(self._make_canon(result)[1:-1])
                 break
 
+        self._traceback.pop()
+
         return "(" + " ".join(canon_tokens) + ")"
 
-    @utils.counted
-    @utils.composed_with(postparse)
-    def _make_canon(self, expr: str) -> str:
-        expr = expr.strip()
+    def _last_token_start(self):
+        return self._traceback[-1].start if self._traceback else 0
 
+    def _make_canon(self, expr: str, stack=False) -> str:
+        if stack:
+            last = self._last_token_start()
+            self._traceback.append(range(last, last + len(expr)))
+
+        expr = self.__make_canon(expr)
+        expr = postparse(expr)
+
+        if stack:
+            self._traceback.pop()
+
+        return expr
+
+    def __make_canon(self, expr: str) -> str:
+        expr = expr.strip()
         if expr in SHORTHANDS:
             return SHORTHANDS[expr]
 
         if len(expr) >= 2:
             # Canonicalizes shorthand brackets.
+            if expr.startswith("#[") and expr[-1] == "]":
+                expr = "(-> (" + expr[2:-1] + "))"
             if expr[0] == "{" and expr[-1] == "}":
                 expr = "(expression " + expr[1:-1] + ")"
             if expr[0] == "[" and expr[-1] == "]":
@@ -230,13 +396,16 @@ class Preprocessor:
                     expr = f"(call {expr[1:-1]})"
                 return expr
 
+        expr, *_ = expr.split(";")
+
         # Canonicalizes ranges.
         if 1 <= expr.count(":") <= 3:
             result = expr.split(":")
-            if any(result) and all(
-                not i or utils.fullmatch(NUMBER_REGEX, i) for i in result
-            ):
+            # assert not any(set("({[]})") & set(i) for i in result)
+            if any(result):
                 return self._make_range_canon(expr)
+            else:
+                raise ValueError(expr)
 
         numeric = get_numeric_or_none(expr)
         if numeric is not None:

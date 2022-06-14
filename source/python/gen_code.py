@@ -109,9 +109,7 @@ def render_all() -> None:
     filecount = 0
     basedir = BASEPATH / ".." / ".."
     line_count = 0
-    logging.debug(
-        f"Rendering all Mako files in the directory '{basedir.absolute()!r}'."
-    )
+    logging.debug(f"Rendering all Mako files in the directory '{basedir.resolve()}'.")
 
     for file in _walk_recursive(basedir):
         if file.name.endswith(".mako"):

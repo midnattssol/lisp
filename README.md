@@ -16,6 +16,7 @@ A Lisp.
     - [x] Optional function argument evaluation in inner closures (the reason why this doesn't work now is that the inner expression doesn't evaluate the argument until it's called, when the original argument has gone out of scope)
     - [ ] Note that closures returning closures with variables which are set both in the inner and outer loop don't work since the return checker replaces all occurrences - this can be fixed with preprocessing though.
     - [ ] Preprocess variables into numbers instead of strings to find them quicker.
+- [ ] #() function syntax
 
 ## Bugs
 

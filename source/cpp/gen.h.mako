@@ -19,7 +19,7 @@ const std::map<const std::string, LispType> TYPENAMES_REV {
 };
 
 void _fill_out_lisp_builtin_types() {
-    *_SINGLETON_NOTHING = {NOTHING, 0};
+    *_SINGLETON_NIL = {NIL, 0};
     *_SINGLETON_NOT_SET = {__NOT_SET__, 0};
     *_SINGLETON_NOARGS_TOKEN = {__NO_ARGS__, 0};
     % for i, _ in enumerate(UNIQUE_SIGNATURES):

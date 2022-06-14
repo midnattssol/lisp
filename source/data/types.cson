@@ -4,7 +4,7 @@
     "STRING": "string",
     "LIST": "list",
     "VECTOR": "vector",
-    "NOTHING": "nothing",
+    "NIL": "nil",
     "BOOL": "bool",
     "BUILTIN": "builtin",
     "TYPE": "type",

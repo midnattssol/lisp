@@ -1,3 +1,28 @@
+ord: [
+    '[(map type [\"string\"])]'
+    'num'
+    'Get the ASCII index for a character.'
+]
+chr: [
+    '[(map type [\"int\"])]'
+    'string'
+    'Get the ASCII character at this index.'
+]
+break: [
+    '[]'
+    'nil'
+    'Break out of a loop.'
+]
+not: [
+    '[(map type [\"any\"])]'
+    'bool'
+    'Return No if the argument is truthy and Yes otherwise.'
+]
+return: [
+    '[(map type [\"any\"])]'
+    'any'
+    'Return the argument from the function.'
+]
 mul: [
     '[(map type [\"*\" \"numeric\"])]'
     'numeric'
@@ -23,6 +48,11 @@ and: [
     'numeric'
     'Return the bitwise `and` of all arguments, defaulting to `(flip 0)`.'
 ]
+find: [
+    '[(map type ["any"]) (map type ["vector"])]'
+    'int'
+    'Return the first index at which $0 occurs in $1, or Nothing if it can\'t be found.'
+]
 xor: [
     '[(map type [\"*\" \"numeric\"])]'
     'numeric'
@@ -47,11 +77,6 @@ leq: [
     '[(map type [\"*\" \"numeric\"])]'
     'bool'
     'Return `True` if all arguments are ordered in non-strictly increasing order, or `False` otherwise.'
-]
-noop: [
-    '[(map type [\"*\"])]'
-    'nothing'
-    'Do nothing with the arguments.'
 ]
 vector: [
     '[(map type [\"*\"])]'
@@ -85,7 +110,7 @@ repr: [
 ]
 put: [
     '[(map type [\"*\"])]'
-    'nothing'
+    'nil'
     'Print the arguments to `stdout`.'
 ]
 help: [
@@ -155,7 +180,7 @@ linsert: [
 ]
 assert: [
     '[(map type [\"booly\"]) (map type [\"string\" \"?\"])]'
-    'nothing'
+    'nil'
     'Check if the argument is truthy, showing an optional error message before quitting.'
 ]
 bool: [
@@ -187,6 +212,11 @@ map: [
     '[(map type [\"callable\"]) (map type [\"vector\" \"*\"])]'
     'vector'
     'Return a new vector with the callable applied to each element in the original vector.'
+]
+accumulate: [
+    '[(map type [\"callable\"]) (map type [\"vector\"]) (map type [\"?\"])]'
+    'vector'
+    'Accumulate the vector using a callable and an optional accumulator.'
 ]
 fold: [
     '[(map type [\"callable\"]) (map type [\"vector\"]) (map type [\"?\"])]'
@@ -220,19 +250,19 @@ match: [
     'Return whether or not the regular expression $0 fully matches the string $1.'
 ]
 do: [
-    '[(map type [\"+\"])]'
+    '[(map type [\"*\"])]'
     'any'
-    'Return the last of its arguments.'
+    'Return the last of its arguments, or Nil if none are given.'
 ]
 while: [
     '[(map type [\"expression\"]) (map type [\"expression\"])]'
-    'nothing'
+    'nil'
     'As long as the result of evaluating $0 is `True`, $1 is evaluated.'
 ]
 exit: [
-    '[(map type [\"int\"])]'
-    'nothing'
-    'Exit the program with $0 as the error code.'
+    '[(map type [\"int\" "?"])]'
+    'nil'
+    'Exit the program with $0 as the error code, defaulting to 0.'
 ]
 expression: [
     '[(map type [\"*\"])]'
@@ -241,7 +271,7 @@ expression: [
 ]
 push: [
     '[(map type [\"vector\"]) (map type [\"any\"])]'
-    'nothing'
+    'nil'
     'Push $1 at the end of $0 in-place.'
 ]
 pop: [
@@ -266,6 +296,6 @@ float: [
 ]
 seed: [
     '[(map type [\"int\"])]'
-    'nothing'
+    'nil'
     'Seed the Mersenne Twister used by `rand`.'
 ]

@@ -1,20 +1,19 @@
 """Provides a Macro class."""
 import dataclasses as dc
 import typing as t
-import math
 
 
 @dc.dataclass
 class Arity:
-    start: float = -math.inf
-    stop: float = math.inf
+    start: float = -float("inf")
+    stop: float = float("inf")
 
     def __contains__(self, num):
         return self.stop >= num >= self.start
 
     @classmethod
     def any(cls):
-        return cls(-math.inf, math.inf)
+        return cls(-float("inf"), float("inf"))
 
     @classmethod
     def min(cls, n):
@@ -72,10 +71,14 @@ class BadMacroArity(BaseException):
     def __repr__(self):
         """Get representation."""
         m = self.macro
-        macro_name = " / ".join(map("`{}`".format, m.names))
-        if (m.arity.start - m.arity.stop) < 1:
-            num = str(m.arity.start)
-        else:
-            num = f"{m.arity.start}-{m.arity.stop}"
 
-        return f"Macro {macro_name} expected {num} arguments, but recieved {self.n}."
+        if (m.arity.stop - m.arity.start) < 1:
+            num = str(m.arity.start)
+        elif m.arity.stop == float("inf"):
+            num = f"at least {m.arity.start}"
+        elif m.arity.start == -float("inf"):
+            num = f"at most {m.arity.stop}"
+        else:
+            num = f"between {m.arity.start} and {m.arity.stop}"
+
+        return f"Macro `{m.names[0]}` expected {num} arguments, but recieved {self.n}."

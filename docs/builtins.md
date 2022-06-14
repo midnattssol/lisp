@@ -3,9 +3,9 @@
 This page has documentation about the builtins of the Lisp.
 
 ## `do`
-_Signature: `[+] -> any`_
+_Signature: `[*] -> any`_
 
-Return the last of its arguments.
+Return the last of its arguments, or Nil if none are given.
 
 ## `eq`
 _Signature: `[*] -> bool`_
@@ -36,6 +36,11 @@ Add all arguments together, defaulting to 0.
 _Signature: `[* numeric] -> numeric`_
 
 Return the bitwise `and` of all arguments, defaulting to `(flip 0)`.
+
+## `chr`
+_Signature: `[int] -> string`_
+
+Get the ASCII character at this index.
 
 ## `div`
 _Signature: `[numeric] [numeric] -> numeric`_
@@ -97,13 +102,23 @@ _Signature: `[*] -> bool`_
 
 Return `True` if all elements are different, or `False` otherwise.
 
+## `not`
+_Signature: `[any] -> bool`_
+
+Return No if the argument is truthy and Yes otherwise.
+
+## `ord`
+_Signature: `[string] -> num`_
+
+Get the ASCII index for a character.
+
 ## `pop`
 _Signature: `[vector] -> any`_
 
 Pop the last element of $0 in-place.
 
 ## `put`
-_Signature: `[*] -> nothing`_
+_Signature: `[*] -> nil`_
 
 Print the arguments to `stdout`.
 
@@ -133,9 +148,14 @@ _Signature: `[any] -> any`_
 Return a copy of $0.
 
 ## `exit`
-_Signature: `[int] -> nothing`_
+_Signature: `[int ?] -> nil`_
 
-Exit the program with $0 as the error code.
+Exit the program with $0 as the error code, defaulting to 0.
+
+## `find`
+_Signature: `[any] [vector] -> int`_
+
+Return the first index at which $0 occurs in $1, or Nothing if it can't be found.
 
 ## `flip`
 _Signature: `[int] -> int`_
@@ -166,13 +186,8 @@ _Signature: `[*] -> list`_
 
 Construct a linked list containing the arguments.
 
-## `noop`
-_Signature: `[*] -> nothing`_
-
-Do nothing with the arguments.
-
 ## `push`
-_Signature: `[vector] [any] -> nothing`_
+_Signature: `[vector] [any] -> nil`_
 
 Push $1 at the end of $0 in-place.
 
@@ -187,7 +202,7 @@ _Signature: `[any] -> string`_
 Get a string representation of the argument.
 
 ## `seed`
-_Signature: `[int] -> nothing`_
+_Signature: `[int] -> nil`_
 
 Seed the Mersenne Twister used by `rand`.
 
@@ -195,6 +210,11 @@ Seed the Mersenne Twister used by `rand`.
 _Signature: `[string] -> type`_
 
 Construct a type object from a typename.
+
+## `break`
+_Signature: ` -> nil`_
+
+Break out of a loop.
 
 ## `float`
 _Signature: `[numeric] -> float`_
@@ -217,12 +237,12 @@ _Signature: `[vector] [int] [int ?] [int ?] -> vector`_
 Return the elements between $1 and $2 inclusive in the vector, with a step size equal to the $3.
 
 ## `while`
-_Signature: `[expression] [expression] -> nothing`_
+_Signature: `[expression] [expression] -> nil`_
 
 As long as the result of evaluating $0 is `True`, $1 is evaluated.
 
 ## `assert`
-_Signature: `[booly] [string ?] -> nothing`_
+_Signature: `[booly] [string ?] -> nil`_
 
 Check if the argument is truthy, showing an optional error message before quitting.
 
@@ -235,6 +255,11 @@ Return a copy of $2 with $0 inserted at the index $1.
 _Signature: `[int] [any] -> vector`_
 
 Return a vector of length equal to $0 by repeating $1.
+
+## `return`
+_Signature: `[any] -> any`_
+
+Return the argument from the function.
 
 ## `typeof`
 _Signature: `[any] -> type`_
@@ -270,6 +295,11 @@ Evaluate an expression.
 _Signature: `[vector] [vector] -> bool`_
 
 Return whether or not the type of $1 matches $0 as a type descriptor.
+
+## `accumulate`
+_Signature: `[callable] [vector] [?] -> vector`_
+
+Accumulate the vector using a callable and an optional accumulator.
 
 ## `expression`
 _Signature: `[*] -> expression`_

@@ -1,12 +1,18 @@
 {
+    # Arithmetic operations
     "*=": {"op": "*"},
     "-=": {"op": "-"},
     "+=": {"op": "+"},
-    "/=": {"op": "/"},
     "^=": {"op": "^"},
+    "%=": {"op": "%"},
     "&=": {"op": "&"},
     "|=": {"op": "|"},
+    "//=": {"op": "//"},
+    # Slice and join
     ",=": {"op": ","},
     "$=": {"op": "$"},
-    "inplace_transform!": {"op": "map", "rev": true}
+    # Fold, reduce and map
+    "/=": {"op": "/"},
+    "\\=": {"op": "\\", "rev": true},
+    ".=": {"op": ".", "rev": true}
 }
