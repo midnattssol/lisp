@@ -1,3 +1,13 @@
+not: [
+    '[(map type [\"any\"])]'
+    'bool'
+    'Return No if the argument is truthy and Yes otherwise.'
+]
+return: [
+    '[(map type [\"any\"])]'
+    'any'
+    'Return the argument from the function.'
+]
 mul: [
     '[(map type [\"*\" \"numeric\"])]'
     'numeric'
@@ -22,6 +32,11 @@ and: [
     '[(map type [\"*\" \"numeric\"])]'
     'numeric'
     'Return the bitwise `and` of all arguments, defaulting to `(flip 0)`.'
+]
+find: [
+    '[(map type ["any"]) (map type ["vector"])]'
+    'int'
+    'Return the first index at which $0 occurs in $1, or Nothing if it can\'t be found.'
 ]
 xor: [
     '[(map type [\"*\" \"numeric\"])]'
@@ -187,6 +202,11 @@ map: [
     '[(map type [\"callable\"]) (map type [\"vector\" \"*\"])]'
     'vector'
     'Return a new vector with the callable applied to each element in the original vector.'
+]
+accumulate: [
+    '[(map type [\"callable\"]) (map type [\"vector\"]) (map type [\"?\"])]'
+    'vector'
+    'Accumulate the vector using a callable and an optional accumulator.'
 ]
 fold: [
     '[(map type [\"callable\"]) (map type [\"vector\"]) (map type [\"?\"])]'

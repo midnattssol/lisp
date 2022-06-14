@@ -119,12 +119,15 @@ def main(argv: t.List[str]) -> None:
         file_contents = args.code
 
     else:
+        if not args.origin.exists():
+            logging.error(f"File '{args.origin}' does not exist.")
+            exit(1)
+
         with open(args.origin, "r", encoding="utf-8") as file:
             file_contents = file.read()
 
         processor.contexts[-1] = args.origin
 
-    file_contents = f"(noop {file_contents})"
     canon = processor.make_canon(file_contents)
 
     if args.dump:

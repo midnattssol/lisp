@@ -1,7 +1,7 @@
 /* Defines the LispVar class and singleton Lisp variables.
 
 The singletons are the following:
-- _SINGLETON_NOTHING
+- _SINGLETON_NIL
 - _SINGLETON_NOT_SET
 - _SINGLETON_NOARGS_TOKEN
 */
@@ -17,8 +17,8 @@ The singletons are the following:
 #include "gen_builtins.h"
 #include "tree.h"
 
-#define NUMPART(a) (a.tag == NUM ? a.num : a.flt)
-#define PNUMPART(a) (a->tag == NUM ? a->num : a->flt)
+#define NUMPART(a) (a.tag == FLOAT ? a.flt : a.num)
+#define PNUMPART(a) (a->tag == FLOAT ? a->flt : a->num)
 
 enum LispType {
     NUM,
@@ -26,7 +26,7 @@ enum LispType {
     STRING,
     LIST,
     VECTOR,
-    NOTHING,
+    NIL,
     BOOL,
     BUILTIN,
     TYPE,
@@ -56,7 +56,7 @@ class LispVar {
    public:
     LispType tag;
     union {
-        long int num;                  // Used by NUM, NOTHING, BOOL.
+        long int num;                  // Used by NUM, NIL, BOOL.
         float flt;                     // Used by FLOAT.
         std::string *string;           // Used by STRING and VARIABLE.
         std::vector<LispVar> *vector;  // Used by VECTOR.
@@ -84,9 +84,8 @@ class LispVar {
         // If it's a singleton, tags being the same imply that the objects are
         // the same.
         if (is_singleton()) return true;
-        if (is_numeric() || tag == BUILTIN) {
-            return PNUMPART(this) == NUMPART(var);
-        }
+        if (tag == BUILTIN) { return builtin == var.builtin; }
+        if (is_numeric()) { return PNUMPART(this) == NUMPART(var); }
         if (tag == STRING) return !(*string).compare(*var.string);
 
         // Compare the contents.
@@ -109,7 +108,7 @@ class LispVar {
     bool operator!=(LispVar var) { return !(*this == var); }
 
     constexpr bool is_singleton() {
-        return (tag == __NOT_SET__ || tag == __NO_ARGS__ || tag == NOTHING);
+        return (tag == __NOT_SET__ || tag == __NO_ARGS__ || tag == NIL);
     }
 
     bool is_numeric() { return (tag == NUM || tag == BOOL || tag == FLOAT); }
@@ -122,11 +121,11 @@ class LispVar {
     }
 
     bool is_booly() {
-        return (tag == NUM || tag == NOTHING || tag == BOOL || is_sized());
+        return (tag == NUM || tag == NIL || tag == BOOL || is_sized());
     }
 
     bool truthiness() {
-        if (tag == NUM || tag == NOTHING || tag == BOOL || tag == FLOAT)
+        if (tag == NUM || tag == NIL || tag == BOOL || tag == FLOAT)
             return num;
         if (is_sized()) return size();
         _throw_does_not_implement(tag, "truthiness");
@@ -143,7 +142,7 @@ class LispVar {
     LispVar copy() {
         LispVar output;
         output.tag = tag;
-        if (tag == NUM || tag == NOTHING || tag == BOOL)
+        if (tag == NUM || tag == NIL || tag == BOOL)
             output.num = num;
         else if (tag == FLOAT)
             output.flt = flt;
@@ -231,6 +230,6 @@ class LispVar {
 
 LispVar parse_and_evaluate(std::string input);
 
-auto _SINGLETON_NOTHING = new LispVar;
+auto _SINGLETON_NIL = new LispVar;
 auto _SINGLETON_NOT_SET = new LispVar;
 auto _SINGLETON_NOARGS_TOKEN = new LispVar;

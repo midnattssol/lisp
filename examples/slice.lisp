@@ -11,10 +11,10 @@
 (# numbers) ; -> 50
 
 ; Reverse the list.
-(slice numbers -1 0 -1) ; -> [49 .. 0]
+($ numbers -1 0 -1) ; -> [49 .. 0]
 
 ; Get elements with indices ranging between 10 and 20.
-(slice numbers 10 20) ; -> [10 .. 19]
+($ numbers 10 20) ; -> [10 .. 19]
 
 ; Join lists.
 (, :3 :5 :3) ; -> [0, 1, 2, 0, 1, 2, 3, 4, 0, 1, 2]

@@ -97,6 +97,11 @@ _Signature: `[*] -> bool`_
 
 Return `True` if all elements are different, or `False` otherwise.
 
+## `not`
+_Signature: `[any] -> bool`_
+
+Return No if the argument is truthy and Yes otherwise.
+
 ## `pop`
 _Signature: `[vector] -> any`_
 
@@ -136,6 +141,11 @@ Return a copy of $0.
 _Signature: `[int] -> nothing`_
 
 Exit the program with $0 as the error code.
+
+## `find`
+_Signature: `[any] [vector] -> int`_
+
+Return the first index at which $0 occurs in $1, or Nothing if it can't be found.
 
 ## `flip`
 _Signature: `[int] -> int`_
@@ -236,6 +246,11 @@ _Signature: `[int] [any] -> vector`_
 
 Return a vector of length equal to $0 by repeating $1.
 
+## `return`
+_Signature: `[any] -> any`_
+
+Return the argument from the function.
+
 ## `typeof`
 _Signature: `[any] -> type`_
 
@@ -270,6 +285,11 @@ Evaluate an expression.
 _Signature: `[vector] [vector] -> bool`_
 
 Return whether or not the type of $1 matches $0 as a type descriptor.
+
+## `accumulate`
+_Signature: `[callable] [vector] [?] -> vector`_
+
+Accumulate the vector using a callable and an optional accumulator.
 
 ## `expression`
 _Signature: `[*] -> expression`_

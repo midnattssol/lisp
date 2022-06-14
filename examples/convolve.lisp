@@ -2,7 +2,7 @@
 
 
 ; Convolves two lists together.
-; For an intuitive explanation of what a convolution is, see
+; For an intuitive explanation of a convolution, see
 ; https://betterexplained.com/articles/intuitive-convolution.
 (=> convolve_lists [kernel signal] (do
     (= kernel (slice kernel -1 0 -1))
@@ -17,7 +17,7 @@
 
     (while! (< i l) (do
         (= window (slice signal i (+ i n -1)))
-        (push out (fold + (map * kernel window)))
+        (push out (/ + (map * kernel window)))
         (++ i)
     ))
 
@@ -27,11 +27,11 @@
 ; Return all items of the resulting convolution where the kernel and signal
 ; overlap completely, so no boundaries are visible.
 (=> convolve_lists_valid [kernel signal] (do
-    (= offset (int (/ (# kernel) 2)))
+    (= offset (// (# kernel) 2))
     (+= offset 1)
     (slice (convolve_lists kernel signal) offset (neg (+ offset 1)))
 ))
 
 
-(= result (convolve_lists_valid (repeat 3 (/ 1 3)) [1 2 3 4 1]))
+(= result (convolve_lists_valid (repeat 3 (// 1. 3.)) [1 2 3 4 1]))
 (put result)

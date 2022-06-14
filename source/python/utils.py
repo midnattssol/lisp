@@ -7,6 +7,7 @@ import typing as t
 
 import cson
 import regex as re
+import functools as ft
 
 
 def temp_path():
@@ -51,11 +52,11 @@ def fullmatch(pattern, string, *args, **kwargs):
     return item and len(item.group()) == len(string)
 
 
-def composed_with(outer):
+def composed_with(*outer):
     """Decorate a function to compose it with another one."""
 
     def decorator(function):
-        return after(outer, function)
+        return ft.reduce(after, [function, *outer][::-1])
 
     return decorator
 
