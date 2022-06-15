@@ -6,7 +6,7 @@
     (= nums [2 3 5 7])
     (.= nums #[! (% x _)])
     (. put (if!
-        (/ | nums)
+        (/ || nums)
         (.@ nums words)
         [x]
     ))

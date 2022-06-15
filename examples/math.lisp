@@ -20,20 +20,20 @@
 ; Get prime factors of a number.
 (=> factors (do
     (= i 2)
-    (while! (leq (* i i) _) (do
-        (unless! (% _ i) (return (push! i (factors (// _ i)))))
-        (++ i)
-    ))
+    (while!
+        (leq (* i i) _)
+        (unless! (% _ i) (return (push! i (factors (// _ i)))) (++ i))
+    )
     [_]
 ))
 
 ; Gets whether or not a number is prime.
 (=> prime? (do
     (= i 2)
-    (while! (leq (* i i) _) (do
-        (unless! (% _ i) (return No))
-        (++ i)
-    ))
+    (while!
+        (leq (* i i) _)
+        (unless! (% _ i) (return No) (++ i))
+    )
     Yes
 ))
 

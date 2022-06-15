@@ -1,0 +1,3 @@
+(while! Yes
+    (putl! "> " (input))
+)

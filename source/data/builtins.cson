@@ -1,12 +1,43 @@
+apply: [
+    '[(map type [\"callable\"]) (map type [\"vector\"])]'
+    'vector'
+    'Call a function using $2 as the arguments.'
+    '(apply + [1 2 3]) ; 6'
+]
+split: [
+    '[(map type [\"string\"]) (map type [\"string\"])]'
+    'vector'
+    'Split a string by a regular expression.'
+    '(split "\\s" "Hello world!") ; ["Hello" "world!"] '
+]
+findall: [
+    '[(map type [\"string\"]) (map type [\"string\"])]'
+    'vector'
+    'Find all matches of a regular expression.'
+    '(findall "\\d+" "a is 20 and b is 19") ; ["20" "19"] '
+]
+input: [
+    '[]'
+    'string'
+    'Get user input from stdin.'
+]
+parse: [
+    '[(map type [\"string\"])]'
+    'any'
+    'Parse and evaluate a simple expression in string form.'
+    '(parse "10") ; 10'
+]
 ord: [
     '[(map type [\"string\"])]'
     'num'
     'Get the ASCII index for a character.'
+    '(ord "a") ; 97'
 ]
 chr: [
     '[(map type [\"int\"])]'
     'string'
     'Get the ASCII character at this index.'
+    '(chr 97) ; "a"'
 ]
 break: [
     '[]'
@@ -27,16 +58,19 @@ mul: [
     '[(map type [\"*\" \"numeric\"])]'
     'numeric'
     'Multiply all arguments together, defaulting to 1.'
+    '(* 1 2 3 4) ; 24'
 ]
 rand: [
     '[(map type [\"int\"])]'
     'vector'
     'Get a vector of random integers of length equal to the argument. The numbers are generated using the MT19937 implementation of the Mersenne Twister.'
+    '(rand 5)'
 ]
 add: [
     '[(map type [\"*\" \"numeric\"])]'
     'numeric'
     'Add all arguments together, defaulting to 0.'
+    '(+ 1 2 3 4) ; 10'
 ]
 or: [
     '[(map type [\"*\" \"numeric\"])]'
@@ -134,9 +168,9 @@ type: [
     'Construct a type object from a typename.'
 ]
 join: [
-    '[(map type [\"*\" \"vector\"])]'
-    'vector'
-    'Join any number of vectors together.'
+    '[(map type [\"*\" \"iterable\"])]'
+    'iterable'
+    'Join any number of iterables together.'
 ]
 neg: [
     '[(map type [\"numeric\"])]'
@@ -189,9 +223,9 @@ bool: [
     'Cast the input to a boolean.'
 ]
 slice: [
-    '[(map type [\"vector\"]) (map type [\"int\"]) (map type [\"int\" \"?\"]) (map type [\"int\" \"?\"])]'
-    'vector'
-    'Return the elements between $1 and $2 inclusive in the vector, with a step size equal to the $3.'
+    '[(map type [\"iterable\"]) (map type [\"int\"]) (map type [\"int\" \"?\"]) (map type [\"int\" \"?\"])]'
+    'iterable'
+    'Return the elements between $1 and $2 inclusive in the iterable, with a step size equal to the $3.'
 ]
 repeat: [
     '[(map type [\"int\"]) (map type [\"any\"])]'

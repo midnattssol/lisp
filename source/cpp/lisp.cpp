@@ -62,6 +62,15 @@ void _lisp_assert_or_exit(bool condition, std::string message) {
     exit(1);
 }
 
+[[noreturn]] void _throw_could_not_cast(LispVar expected,
+                                        LispVar actual,
+                                        LispVar of) {
+    std::cout << "[CastingError] Could not cast `" << actual.to_str()
+              << "` to signature `" << expected.to_str() << "` of `"
+              << of.to_str() << "`.";
+    exit(1);
+}
+
 VariableScope<LispVar> VARIABLE_SCOPE = {{}, 0};
 
 std::string LispVar::to_str() {
@@ -495,14 +504,30 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar *> args) {
             actual_type.tag = VECTOR;
             actual_type.vector = new std::vector<LispVar>;
             for (auto arg : args) { actual_type.vector->push_back(*arg); }
-            _throw_could_not_cast(*BUILTINS_TYPES.at(name), actual_type);
+
+            _throw_could_not_cast(
+                *BUILTINS_TYPES.at(name), actual_type, operation);
         }
+    }
+
+    if (op == B_PARSE) {
+        output = evaluate_const(*args[0]->string);
+        return output;
     }
 
     // No operation.
     if (op == B_DO) { return arity ? *args[arity - 1] : *_SINGLETON_NIL; }
     if (op == B_CALL) {
         return call_variable(*args[0], {args.begin() + 1, args.end()});
+    }
+
+    if (op == B_APPLY) {
+        std::vector<LispVar *> new_args;
+        size_t nargs = args[1]->vector->size();
+        for (size_t i = 0; i < nargs; i++) {
+            new_args.push_back(&(*args[1]->vector)[i]);
+        }
+        return call_variable(*args[0], new_args);
     }
     if (op == B_EXIT) { exit(arity ? args[0]->num : 0); }
     if (op == B_WHILE) {
@@ -513,7 +538,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar *> args) {
             } catch (LispBreak &_) { break; }
 
             count++;
-            if (count > 1000) {
+            if (count > 100000) {
                 std::cout << "Infinite loop!" << '\n';
                 exit(1);
             }
@@ -557,8 +582,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar *> args) {
         return *_SINGLETON_NIL;
     }
 
-    // Do regular expression matching.
-    if (op == B_MATCH) {
+    if ((op == B_MATCH) | (op == B_FINDALL) | (op == B_SPLIT)) {
         std::regex txt_regex;
         try {
             txt_regex = std::regex(*args[0]->string);
@@ -567,10 +591,38 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar *> args) {
                       << " is an invalid regular expression.\n";
             exit(1);
         }
+        // Return whether or not an expression matches.
+        if (op == B_MATCH) {
+            output.tag = BOOL;
+            output.num = std::regex_match(*args[1]->string, txt_regex);
+            return output;
+        }
 
-        output.tag = BOOL;
-        output.num = std::regex_match(*args[1]->string, txt_regex);
-        return output;
+        if ((op == B_SPLIT) | (op == B_FINDALL)) {
+            // Get a token iterator which finds the groups.
+            // -1 is for split and 0 for the first capture group.
+            std::regex_token_iterator<std::string::iterator> rend;
+            std::regex_token_iterator<std::string::iterator> iter(
+                args[1]->string->begin(),
+                args[1]->string->end(),
+                txt_regex,
+                (op == B_SPLIT) ? -1 : 0);
+
+            output.vector = new std::vector<LispVar>;
+            output.tag = VECTOR;
+
+            // Push all matches into the vector.
+            while (iter != rend) {
+                LispVar var;
+                var.string = new std::string;
+                var.tag = STRING;
+
+                *var.string = (*iter++);
+                output.vector->push_back(var);
+            }
+
+            return output;
+        }
     }
 
     // ===| Base constructors |===
@@ -582,8 +634,14 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar *> args) {
         return output;
     }
 
+    if (op == B_INPUT) {
+        output.tag = STRING;
+        output.string = new std::string;
+        std::getline(std::cin, *output.string);
+        return output;
+    }
+
     if (op == B_ORD) {
-        assert(args[0]->size() == 1);
         output.tag = NUM;
         output.num = (*args[0]->string)[0];
         return output;
@@ -658,10 +716,7 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar *> args) {
 
     // Write a string to `cout`.
     if (op == B_PUT) {
-        for (size_t i = 0; i < arity; i++) {
-            std::cout << args[i]->to_str();
-            if (i != (arity - 1)) std::cout << " ";
-        }
+        for (size_t i = 0; i < arity; i++) std::cout << args[i]->to_str();
         return *_SINGLETON_NIL;
     }
 
@@ -905,17 +960,41 @@ LispVar call_builtin(LispVar operation, std::vector<LispVar *> args) {
         stop = std::min(stop, size - 1);
         start = std::min(start, size - 1);
 
-        output.tag = VECTOR;
-        output.vector = new std::vector<LispVar>;
+        if (args[0]->tag == VECTOR) {
+            output.tag = VECTOR;
+            output.vector = new std::vector<LispVar>;
 
-        if (stop > start && step < 0) return output;
-        if (stop < start && step > 0) return output;
+            if (stop > start && step < 0) return output;
+            if (stop < start && step > 0) return output;
 
-        for (int i = start; (step > 0) ? (i <= stop) : (i >= stop); i += step) {
-            (*output.vector).push_back((*args[0]->vector)[i]);
+            for (int i = start; (step > 0) ? (i <= stop) : (i >= stop);
+                 i += step) {
+                (*output.vector).push_back((*args[0]->vector)[i]);
+            }
+
+            return output;
         }
 
-        return output;
+        if (args[0]->tag == STRING) {
+            output.tag = STRING;
+            output.string = new std::string;
+
+            std::ostringstream buf;
+
+            if (stop > start && step < 0) return output;
+            if (stop < start && step > 0) return output;
+
+            for (int i = start; (step > 0) ? (i <= stop) : (i >= stop);
+                 i += step) {
+                buf << (*args[0]->string)[i];
+            }
+
+            *output.string = buf.str();
+            return output;
+        }
+
+        std::cout << "Slice not implemented for this type\n";
+        exit(1);
     }
 
     if (op == B_EVAL_EXPR) { return evaluate_expression(args[0], 1); }
@@ -1188,8 +1267,8 @@ void print_debug(std::string msg) {
 }
 
 int main(int argc, char const *argv[]) {
-    if (argc != 4) {
-        std::cout << "Error: Expected exactly 3 command-line arguments "
+    if (argc < 4) {
+        std::cout << "Error: Expected at least 3 command-line arguments "
                      "(filename, debug mode, and safe mode)."
                   << '\n';
         exit(1);
@@ -1200,6 +1279,34 @@ int main(int argc, char const *argv[]) {
     DEBUG_MODE = std::stoi(argv[2]);
     SAFE_MODE = std::stoi(argv[3]);
     RNG = std::mt19937(since_epoch.count());
+
+    // Set argv to the command-line arguments.
+    LispVar argv_lisp_var;
+
+    argv_lisp_var.vector = new std::vector<LispVar>;
+    argv_lisp_var.tag = VECTOR;
+
+    // Add the filename.
+    LispVar filename;
+
+    filename.string = new std::string;
+    *filename.string = argv[0];
+    filename.tag = STRING;
+
+    argv_lisp_var.vector->push_back(filename);
+
+    for (int i = 4; i < argc; i++) {
+        LispVar argument;
+
+        argument.string = new std::string;
+        *argument.string = argv[i];
+        argument.tag = STRING;
+
+        argv_lisp_var.vector->push_back(argument);
+    }
+
+    std::string varname = "argv";
+    VARIABLE_SCOPE.set_var(&varname, argv_lisp_var);
 
     _fill_out_lisp_builtin_types();
 

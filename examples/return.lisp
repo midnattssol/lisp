@@ -3,6 +3,4 @@
     (+ (fib (-- _)) (fib (-- _)))
 ))
 
-(putl! (map fib :10))
-
-(putl! .)
+(putl! (. fib :10))

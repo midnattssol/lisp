@@ -32,6 +32,10 @@ _Signature: `[* numeric] -> numeric`_
 
 Add all arguments together, defaulting to 0.
 
+### Examples
+
+    (+ 1 2 3 4) ; 10
+
 ## `and`
 _Signature: `[* numeric] -> numeric`_
 
@@ -41,6 +45,10 @@ Return the bitwise `and` of all arguments, defaulting to `(flip 0)`.
 _Signature: `[int] -> string`_
 
 Get the ASCII character at this index.
+
+### Examples
+
+    (chr 97) ; "a"
 
 ## `div`
 _Signature: `[numeric] [numeric] -> numeric`_
@@ -92,6 +100,10 @@ _Signature: `[* numeric] -> numeric`_
 
 Multiply all arguments together, defaulting to 1.
 
+### Examples
+
+    (* 1 2 3 4) ; 24
+
 ## `neg`
 _Signature: `[numeric] -> numeric`_
 
@@ -111,6 +123,10 @@ Return No if the argument is truthy and Yes otherwise.
 _Signature: `[string] -> num`_
 
 Get the ASCII index for a character.
+
+### Examples
+
+    (ord "a") ; 97
 
 ## `pop`
 _Signature: `[vector] -> any`_
@@ -177,9 +193,9 @@ _Signature: `[any] -> string`_
 Get a help string about the argument.
 
 ## `join`
-_Signature: `[* vector] -> vector`_
+_Signature: `[* iterable] -> iterable`_
 
-Join any number of vectors together.
+Join any number of iterables together.
 
 ## `list`
 _Signature: `[*] -> list`_
@@ -196,6 +212,10 @@ _Signature: `[int] -> vector`_
 
 Get a vector of random integers of length equal to the argument. The numbers are generated using the MT19937 implementation of the Mersenne Twister.
 
+### Examples
+
+    (rand 5)
+
 ## `repr`
 _Signature: `[any] -> string`_
 
@@ -211,6 +231,15 @@ _Signature: `[string] -> type`_
 
 Construct a type object from a typename.
 
+## `apply`
+_Signature: `[callable] [vector] -> vector`_
+
+Call a function using $2 as the arguments.
+
+### Examples
+
+    (apply + [1 2 3]) ; 6
+
 ## `break`
 _Signature: ` -> nil`_
 
@@ -221,10 +250,24 @@ _Signature: `[numeric] -> float`_
 
 Cast the argument to a float.
 
+## `input`
+_Signature: ` -> string`_
+
+Get user input from stdin.
+
 ## `match`
 _Signature: `[string] [string] -> bool`_
 
 Return whether or not the regular expression $0 fully matches the string $1.
+
+## `parse`
+_Signature: `[string] -> any`_
+
+Parse and evaluate a simple expression in string form.
+
+### Examples
+
+    (parse "10") ; 10
 
 ## `range`
 _Signature: `[int ?] [int ?] [int ? truthy] -> vector`_
@@ -232,9 +275,18 @@ _Signature: `[int ?] [int ?] [int ? truthy] -> vector`_
 Return every $2 numbers from $0 to $1.
 
 ## `slice`
-_Signature: `[vector] [int] [int ?] [int ?] -> vector`_
+_Signature: `[iterable] [int] [int ?] [int ?] -> iterable`_
 
-Return the elements between $1 and $2 inclusive in the vector, with a step size equal to the $3.
+Return the elements between $1 and $2 inclusive in the iterable, with a step size equal to the $3.
+
+## `split`
+_Signature: `[string] [string] -> vector`_
+
+Split a string by a regular expression.
+
+### Examples
+
+    (split "\s" "Hello world!") ; ["Hello" "world!"] 
 
 ## `while`
 _Signature: `[expression] [expression] -> nil`_
@@ -275,6 +327,15 @@ Construct a vector containing the arguments.
 _Signature: `[expression] -> closure`_
 
 Construct a closure from an expression containing an argument vector and an expression to evaluate.
+
+## `findall`
+_Signature: `[string] [string] -> vector`_
+
+Find all matches of a regular expression.
+
+### Examples
+
+    (findall "\d+" "a is 20 and b is 19") ; ["20" "19"] 
 
 ## `linsert`
 _Signature: `[any] [int] [iterable] -> list`_

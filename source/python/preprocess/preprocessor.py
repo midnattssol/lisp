@@ -240,13 +240,18 @@ class Preprocessor:
             ),
             Macro(
                 "&&",
-                arity=1,
-                func=lambda args: f'& {" ".join(f"(bool {i})" for i in args)}',
+                arity=Arity.any(),
+                func=lambda args: f'bool (& {" ".join(f"(bool {i})" for i in args)})',
+            ),
+            Macro(
+                "pipe!",
+                arity=Arity.min(2),
+                func=lambda args: f'{"pipe! " + " ".join(args[2:]) if len(args) > 2 else ""} ({args[1]} {args[0]})',
             ),
             Macro(
                 "||",
                 arity=Arity.any(),
-                func=lambda args: f'| {" ".join(f"(bool {i})" for i in args)}',
+                func=lambda args: f'bool (| {" ".join(f"(bool {i})" for i in args)})',
             ),
             Macro(
                 "push!",
@@ -409,7 +414,7 @@ class Preprocessor:
         expr, *_ = expr.split(";")
 
         # Canonicalizes ranges.
-        if 1 <= expr.count(":") <= 3:
+        if not expr.startswith('"') and 1 <= expr.count(":") <= 3:
             result = expr.split(":")
             # assert not any(set("({[]})") & set(i) for i in result)
             if any(result):

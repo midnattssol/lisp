@@ -2,16 +2,16 @@
 
 
 ; Use an indexer to compress an iterable.
-; For example, (compress [1 0 1] [10 20 30]) -> [10 30].
-(=> compress [indexer iterable] (do
+; For example, (sieve [1 0 1] [10 20 30]) -> [10 30].
+(=> sieve [indexer it] (do
     (= out [])
-    (assert (== (# iterable) (# indexer)))
-    (where! [iterable item index] (@ index indexer) (= out (push! item out)))
+    (assert (== (# it) (# indexer)))
+    (where! [it item index] (@ index indexer) (= out (push! item out)))
     out
 ))
 
 
-(= .@ compress)
+(= .@ sieve)
 
 ; Find the first index at which (== item (fn (@ i iter))).
 (=> find_where [fn iter item] (do

@@ -102,6 +102,12 @@ def main(argv: t.List[str]) -> None:
         "--code",
         help="code to execute instead of running from a file",
     )
+    parser.add_argument(
+        "-a",
+        "--args",
+        nargs="*",
+        help="arguments to pass to the Lisp program",
+    )
 
     args = parser.parse_args()
     processor = preprocess.Preprocessor()
@@ -158,14 +164,18 @@ def main(argv: t.List[str]) -> None:
 
     logging.info("Running executable.")
 
-    _run(
-        [
-            str(executable_path),
-            str(temp_path),
-            str(0),
-            str(int(not args.unsafe)),
-        ]
-    )
+    try:
+        _run(
+            [
+                str(executable_path),
+                str(temp_path),
+                str(0),
+                str(int(not args.unsafe)),
+                *(args.args if args.args is not None else []),
+            ]
+        )
+    except KeyboardInterrupt:
+        pass
 
 
 if __name__ == "__main__":

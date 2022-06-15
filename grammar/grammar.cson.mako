@@ -68,7 +68,7 @@
         name: 'entity.name.function'
     }
     {
-        match: '\\w(\\w|[-_+?])*'
+        match: '\\w(\\w|[-_+?\'])*'
         name: 'variable'
     }
 ]
