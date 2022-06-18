@@ -13,7 +13,7 @@
     (= frac (split "/" frac))
     (.= frac parse)
 
-    (= sorted (if! (/ > frac) (reverse! frac) frac))
+    (= sorted (if! (/ > frac) (rev! frac) frac))
     (= gcd_ (apply gcd sorted))
     (. #[// _ gcd_] frac)
 ))

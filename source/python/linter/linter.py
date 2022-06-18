@@ -1,5 +1,5 @@
 #!/usr/bin/env python3.10
-""""""
+"""A work-in-progress linter for the Lisp."""
 import dataclasses as dc
 import itertools as it
 

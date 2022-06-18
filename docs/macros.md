@@ -10,7 +10,7 @@ Logical and. Casts all items to bools before `and`ing them together.
 
 Logical or. Casts all items to bools before `or`ing them together.
 
-## `reverse!`
+## `rev!`
 
 Reverse a collection.
 

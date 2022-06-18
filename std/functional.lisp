@@ -1,9 +1,9 @@
 (use! "math")
 
 ; Short-circuit Nil.
-(=> nil? (? (== _ Nil)))
+(=> nil? (== _ Nil))
 (=> default_on_nil [_ x] (? (nil? _) x _))
-(=> ?> [fn _] (unless! (== _ Nil) (fn _)))
+(=> ?> [fn _] (unless! (nil? _) (fn _)))
 
 (=> is_type? [a typename]
     (typematch [[(type typename)]] [a])

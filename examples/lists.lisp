@@ -16,7 +16,7 @@
 (len numbers) ; -> 50
 
 ; Reverse the list.
-(reverse! numbers) ; -> [49 ... 0]
+(rev! numbers) ; -> [49 ... 0]
 ($ numbers -1 0 -1) ; -> [49 ... 0]
 (slice numbers -1 0 -1) ; -> [49 ... 0]
 

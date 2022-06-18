@@ -1,4 +1,4 @@
-/* A proof of concept of variable resolution at runtime in the lisp.*/
+/* Provides runtime variable resolution in the lisp.*/
 #include <forward_list>
 #include <iostream>
 #include <map>

@@ -279,7 +279,7 @@ class Preprocessor:
                 func=lambda args: f"while! Yes {' '.join(args)}",
             ),
             Macro(
-                "reverse!",
+                "rev!",
                 arity=Arity(1),
                 func=lambda args: f"slice {args[0]} -1 0 -1",
             ),

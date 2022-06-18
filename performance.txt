@@ -1,4 +1,0 @@
-Did 10 iteration(s) of insertion sort over 4 512-element lists.
-Python:      0.04099s.
-Lisp:        2.85013s.
-Python was 69.53 times faster than the Lisp.

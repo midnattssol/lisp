@@ -1,10 +1,15 @@
-"""Provides a Macro class."""
+#!/usr/bin/env python3.10
+"""Provides macro handling."""
 import dataclasses as dc
 import typing as t
 
 
 @dc.dataclass
 class Arity:
+    """Represents an inclusive range of floating-point numbers.
+
+    Use the __contains__ function to check if a number falls in the range."""
+
     start: float = -float("inf")
     stop: float = float("inf")
 
@@ -63,13 +68,13 @@ class Macro:
 
 @dc.dataclass
 class BadMacroArity(BaseException):
-    """Thrown on incorrect macro arity."""
+    """Exception thrown on incorrect macro arity."""
 
     n: int
     macro: Macro
 
     def __repr__(self):
-        """Get representation."""
+        """Get a string representation."""
         m = self.macro
 
         if (m.arity.stop - m.arity.start) < 1:

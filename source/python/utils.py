@@ -1,5 +1,6 @@
 #!/usr/bin/env python3.10
-"""Utilities."""
+"""Utilities used by other files in the repository."""
+import functools as ft
 import hashlib
 import pathlib as p
 import secrets
@@ -7,7 +8,6 @@ import typing as t
 
 import cson
 import regex as re
-import functools as ft
 
 
 def temp_path():

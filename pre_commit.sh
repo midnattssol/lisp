@@ -9,9 +9,6 @@ for i in tests/*.lisp; do
     ./lisp --log DEBUG $i
 done
 
-# Saves the performance statistics.
-python source/python/speed.py --num 100 > performance.txt
-
 # Saves the dependency tree for easy access.
 python source/python/includetree.py source/cpp/lisp.cpp > includetree.txt
 

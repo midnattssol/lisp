@@ -47,7 +47,7 @@ break: [
 not: [
     '[(map type [\"any\"])]'
     'bool'
-    'Return No if the argument is truthy and Yes otherwise.'
+    'Return `No` if the argument is truthy and `Yes` otherwise.'
 ]
 return: [
     '[(map type [\"any\"])]'
@@ -286,7 +286,7 @@ match: [
 do: [
     '[(map type [\"*\"])]'
     'any'
-    'Return the last of its arguments, or Nil if none are given.'
+    'Return the last of its arguments, or `Nil` if none are given.'
 ]
 while: [
     '[(map type [\"expression\"]) (map type [\"expression\"])]'

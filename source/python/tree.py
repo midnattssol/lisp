@@ -1,8 +1,8 @@
 #!/usr/bin/env python3.10
 """An implementation of a basic tree structure."""
 import collections as col
-import itertools as it
 import enum
+import itertools as it
 import typing as t
 
 import more_itertools as mit

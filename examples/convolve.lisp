@@ -5,7 +5,7 @@
 ; For an intuitive explanation of a convolution, see
 ; https://betterexplained.com/articles/intuitive-convolution.
 (=> convolve [kernel signal] (do
-    (= kernel (reverse! kernel))
+    (= kernel (rev! kernel))
     (= n (# kernel))
     (= out [])
 

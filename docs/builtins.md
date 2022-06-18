@@ -5,7 +5,7 @@ This page has documentation about the builtins of the Lisp.
 ## `do`
 _Signature: `[*] -> any`_
 
-Return the last of its arguments, or Nil if none are given.
+Return the last of its arguments, or `Nil` if none are given.
 
 ## `eq`
 _Signature: `[*] -> bool`_
@@ -117,7 +117,7 @@ Return `True` if all elements are different, or `False` otherwise.
 ## `not`
 _Signature: `[any] -> bool`_
 
-Return No if the argument is truthy and Yes otherwise.
+Return `No` if the argument is truthy and `Yes` otherwise.
 
 ## `ord`
 _Signature: `[string] -> num`_

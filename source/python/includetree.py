@@ -1,5 +1,5 @@
 #!/usr/bin/env python3.10
-"""Show the include tree of a file."""
+"""Get the include tree of a C++ file."""
 import argparse
 import pathlib as p
 
@@ -23,8 +23,8 @@ def find_recursive(deptree, index=0):
 
 
 def main() -> None:
-    """Show the include tree of a file."""
-    parser = argparse.ArgumentParser(description="Show the include tree of a C++ file.")
+    """Get the include tree of a C++ file."""
+    parser = argparse.ArgumentParser(description="Get the include tree of a C++ file.")
     parser.add_argument(
         "filename",
         metavar="F",

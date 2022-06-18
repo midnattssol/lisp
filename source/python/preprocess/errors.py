@@ -1,3 +1,5 @@
+#!/usr/bin/env python3.10
+"""Provides pretty error messages."""
 import dataclasses as dc
 import typing as t
 

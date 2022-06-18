@@ -1,4 +1,5 @@
-"""Render Mako templates automagically."""
+#!/usr/bin/env python3.10
+"""Render all Mako templates in the project."""
 import logging
 import pathlib as p
 import typing as t
